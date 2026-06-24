@@ -1,0 +1,253 @@
+blueprint:
+  name: Passive Cooling Window Recommendation
+  description: >-
+    Recommends opening windows when outdoor air can meaningfully cool a warm
+    room, then recommends closing them when the indoor and outdoor temperatures
+    approach equilibrium.
+
+
+    The blueprint compares one indoor and one outdoor temperature sensor.
+    It runs an "open" action once when opening is first recommended, and a
+    "close" action once when the recommendation changes back. Separate open and
+    close thresholds provide hysteresis so the recommendation does not flap when
+    sensor readings fluctuate around a single value.
+
+
+    One automation = one room. Create a separate automation per room.
+
+
+    Inspired by Adam Cornforth's Dynamic Ventilation blueprint
+    (https://github.com/adamcornforth/ha-open-window-blueprint). This is an
+    independent, temperature-only implementation and is not a fork of, nor
+    affiliated with, that project.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/niklasrichardson/ha-passive-cooling-blueprint/main/blueprints/automation/niklasrichardson/passive_cooling_window_recommendation.yaml
+  homeassistant:
+    # 2024.10 is the floor for the modern `action:` sequence syntax used in the
+    # documentation and examples. The blueprint itself avoids newer features so
+    # this minimum is conservative.
+    min_version: 2024.10.0
+  input:
+    room_section:
+      name: Room
+      icon: mdi:home-thermometer
+      collapsed: false
+      input:
+        room_name:
+          name: Room name
+          description: >-
+            A friendly name for the room. Exposed to your actions as the
+            `room_name` variable so you can use it in notification messages.
+          selector:
+            text: {}
+        inside_temperature_sensor:
+          name: Indoor temperature sensor
+          description: >-
+            The sensor measuring the temperature inside the room.
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: temperature
+        outside_temperature_sensor:
+          name: Outdoor temperature sensor
+          description: >-
+            The sensor measuring the outdoor temperature. Use the same unit
+            (°C or °F) as the indoor sensor.
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: temperature
+    threshold_section:
+      name: Thresholds and timing
+      icon: mdi:thermometer-lines
+      collapsed: false
+      input:
+        minimum_indoor_temperature:
+          name: Minimum indoor temperature
+          description: >-
+            Only recommend opening windows when the room is at least this warm.
+            Prevents passive-cooling recommendations during cold weather. Enter
+            this value in the same unit your sensors report (°C or °F).
+          default: 22.0
+          selector:
+            number:
+              min: 0.0
+              max: 45.0
+              step: 0.1
+              unit_of_measurement: "°"
+              mode: box
+        open_temperature_difference:
+          name: Open-window temperature difference
+          description: >-
+            Recommend opening windows when the outdoor temperature is at least
+            this many degrees cooler than indoors. This is the higher of the two
+            hysteresis thresholds and should be GREATER than the close
+            threshold.
+          default: 1.0
+          selector:
+            number:
+              min: 0.1
+              max: 20.0
+              step: 0.1
+              unit_of_measurement: "°"
+              mode: box
+        close_temperature_difference:
+          name: Close-window temperature difference
+          description: >-
+            Recommend closing windows once the outdoor temperature is no longer
+            cooler than indoors by more than this many degrees. This is the
+            lower of the two hysteresis thresholds and should be LESS than the
+            open threshold.
+          default: 0.5
+          selector:
+            number:
+              min: 0.0
+              max: 20.0
+              step: 0.1
+              unit_of_measurement: "°"
+              mode: box
+        stability_duration:
+          name: Stability duration
+          description: >-
+            How long a recommendation must hold steady before its action runs.
+            Smooths out brief sensor spikes. Applies to both the open and close
+            recommendations.
+          default:
+            minutes: 5
+          selector:
+            duration: {}
+    action_section:
+      name: Actions
+      icon: mdi:play-box-multiple
+      collapsed: false
+      input:
+        open_action:
+          name: Open-windows action
+          description: >-
+            Runs once when opening windows is first recommended. Use any
+            action: a notification, TTS, a script, a light, etc. The variables
+            room_name, inside_temperature, outside_temperature,
+            temperature_difference, recommendation and the threshold values are
+            available inside templates.
+          selector:
+            action: {}
+        close_action:
+          name: Close-windows action
+          description: >-
+            Runs once when the recommendation changes to closing windows. The
+            same variables are available as for the open action.
+          selector:
+            action: {}
+    advanced_section:
+      name: Additional conditions (optional)
+      icon: mdi:filter-cog
+      collapsed: true
+      input:
+        open_additional_conditions:
+          name: Additional conditions for the OPEN recommendation
+          description: >-
+            Optional extra conditions that must all be true for the open action
+            to run (for example: only when someone is home, or only at night).
+            Leave empty to always allow.
+          default: []
+          selector:
+            condition: {}
+        close_additional_conditions:
+          name: Additional conditions for the CLOSE recommendation
+          description: >-
+            Optional extra conditions that must all be true for the close action
+            to run. Leave empty to always allow.
+          default: []
+          selector:
+            condition: {}
+
+# Run at most one instance at a time. Open and close are mutually exclusive, so
+# there is no benefit to queueing; silently skip rare overlaps.
+mode: single
+max_exceeded: silent
+
+# Trigger-scoped variables. Blueprint inputs are substituted in here so the
+# trigger templates below can reference them. `trigger_variables` are evaluated
+# once when the automation loads (they cannot read live sensor states), so we
+# only place static input values here, not sensor readings.
+trigger_variables:
+  inside_entity: !input inside_temperature_sensor
+  outside_entity: !input outside_temperature_sensor
+  min_indoor: !input minimum_indoor_temperature
+  open_diff: !input open_temperature_difference
+  close_diff: !input close_temperature_difference
+
+# Two template triggers. A template trigger fires only on the rising edge, when
+# its template result goes from false to true, and not again until it has gone
+# false in between. That edge behaviour is what gives us "run once per change"
+# and natural de-duplication WITHOUT an external state helper:
+#   * The open trigger fires when the room first qualifies for opening.
+#   * While it keeps qualifying, the template stays true and does NOT re-fire.
+#   * The close trigger fires when the difference collapses to the close band.
+# The open and close bands are separated by the hysteresis gap (close_diff <
+# difference < open_diff), where neither template is true, so the current
+# recommendation simply persists.
+triggers:
+  - trigger: template
+    id: open
+    value_template: >-
+      {% set inside = states(inside_entity) %}
+      {% set outside = states(outside_entity) %}
+      {{ is_number(inside) and is_number(outside)
+         and (inside | float) >= (min_indoor | float)
+         and ((inside | float) - (outside | float)) >= (open_diff | float) }}
+    for: !input stability_duration
+  - trigger: template
+    id: close
+    value_template: >-
+      {% set inside = states(inside_entity) %}
+      {% set outside = states(outside_entity) %}
+      {{ is_number(inside) and is_number(outside)
+         and ((inside | float) - (outside | float)) <= (close_diff | float) }}
+    for: !input stability_duration
+
+# Variables exposed to BOTH user actions. Temperatures are numeric and ready to
+# format, e.g. {{ inside_temperature | round(1) }}.
+variables:
+  room_name: !input room_name
+  inside_entity: !input inside_temperature_sensor
+  outside_entity: !input outside_temperature_sensor
+  minimum_indoor_temperature: !input minimum_indoor_temperature
+  open_threshold: !input open_temperature_difference
+  close_threshold: !input close_temperature_difference
+  inside_temperature: "{{ states(inside_entity) | float(0) }}"
+  outside_temperature: "{{ states(outside_entity) | float(0) }}"
+  temperature_difference: >-
+    {{ ((states(inside_entity) | float(0))
+        - (states(outside_entity) | float(0))) | round(2) }}
+  recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
+
+# Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid
+# numbers right now. The triggers already require this, but a sensor can drop to
+# unavailable in the brief window between the trigger firing and the action
+# running. Invalid states (unknown, unavailable, none, "", non-numeric) are
+# rejected here and are never treated as 0.
+conditions:
+  - condition: template
+    value_template: >-
+      {{ is_number(states(inside_entity)) and is_number(states(outside_entity)) }}
+
+# Branch on which trigger fired and apply that recommendation's optional extra
+# conditions. An `and` over an empty condition list evaluates to true, so when a
+# user leaves the optional conditions empty the branch always runs.
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: open
+          - condition: and
+            conditions: !input open_additional_conditions
+        sequence: !input open_action
+      - conditions:
+          - condition: trigger
+            id: close
+          - condition: and
+            conditions: !input close_additional_conditions
+        sequence: !input close_action
