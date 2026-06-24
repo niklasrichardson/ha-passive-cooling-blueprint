@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-24
+
+### Added
+
+- **Optional trend awareness.** Two new optional inputs accept rate-of-change
+  (derivative) sensors for the indoor and outdoor temperatures
+  (`inside_temperature_trend`, `outside_temperature_trend`), plus a
+  `minimum_convergence_rate` input.
+- **Convergence-based early close.** When the indoor/outdoor gap is actively
+  closing toward equilibrium (outside catching up faster than the room is
+  warming) while inside the hysteresis band, the blueprint now recommends
+  closing the windows early to lock in the cooler air before the room warms back
+  up — useful as morning temperatures rise.
+- New action variables: `inside_trend`, `outside_trend`, `difference_trend`
+  (degrees per hour).
+- Tests for the trend / early-close behaviour, including the morning
+  cold-but-rising case (keeps ventilating) and graceful fallback when a trend
+  sensor is invalid or unset.
+
+### Notes
+
+- Trend awareness is entirely optional and off by default. With the trend inputs
+  left blank, behaviour is identical to 0.1.0 (instantaneous, temperature only).
+- The open recommendation is unchanged; trends refine only the close decision.
+
 ## [0.1.0] - 2026-06-24
 
 ### Added
@@ -39,4 +64,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.1.0

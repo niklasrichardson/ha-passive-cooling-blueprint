@@ -88,14 +88,29 @@ def make_env():
     return env
 
 
-def render(template_str, *, inside_state, outside_state, context):
+def render(
+    template_str,
+    *,
+    inside_state,
+    outside_state,
+    context,
+    inside_trend_state=None,
+    outside_trend_state=None,
+):
     """Render a trigger value_template the way HA would and return a bool."""
     env = make_env()
     states = {
         context["inside_entity"]: inside_state,
         context["outside_entity"]: outside_state,
     }
+    # Only register trend entities when both the input is configured (a non-empty
+    # entity id in the context) and a state was supplied for this scenario.
+    if context.get("inside_trend_entity") and inside_trend_state is not None:
+        states[context["inside_trend_entity"]] = inside_trend_state
+    if context.get("outside_trend_entity") and outside_trend_state is not None:
+        states[context["outside_trend_entity"]] = outside_trend_state
     globals_ = dict(context)
+    # An unconfigured trend input is an empty entity id; states('') -> unknown.
     globals_["states"] = lambda entity: states.get(entity, "unknown")
     globals_["is_number"] = ha_is_number
     result = env.from_string(template_str).render(**globals_).strip()
@@ -126,12 +141,24 @@ class BlueprintStructureTests(unittest.TestCase):
             "open_temperature_difference",
             "close_temperature_difference",
             "stability_duration",
+            "inside_temperature_trend",
+            "outside_temperature_trend",
+            "minimum_convergence_rate",
             "open_action",
             "close_action",
             "open_additional_conditions",
             "close_additional_conditions",
         }
         self.assertEqual(names, expected)
+
+    def test_trend_inputs_are_optional(self):
+        inputs = {}
+        for section in self.blueprint["input"].values():
+            inputs.update(section["input"])
+        # Optional trend inputs must declare a default so they can be left blank.
+        for key in ("inside_temperature_trend", "outside_temperature_trend"):
+            self.assertIn("default", inputs[key], key)
+            self.assertEqual(inputs[key]["default"], "")
 
     def test_temperature_sensors_filter_for_temperature(self):
         inputs = {}
@@ -161,12 +188,17 @@ class BlueprintStructureTests(unittest.TestCase):
 class TriggerTemplateTests(unittest.TestCase):
     """Render the real trigger templates against the spec scenarios."""
 
+    # Trend inputs left blank (empty entity ids) -> trend awareness disabled,
+    # i.e. the temperature-only behaviour.
     CONTEXT = {
         "inside_entity": "sensor.inside",
         "outside_entity": "sensor.outside",
+        "inside_trend_entity": "",
+        "outside_trend_entity": "",
         "min_indoor": 22.0,
         "open_diff": 1.0,
         "close_diff": 0.5,
+        "converge_rate": 0.1,
     }
 
     def setUp(self):
@@ -330,6 +362,86 @@ class EdgeBehaviourTests(unittest.TestCase):
         self.assertEqual(
             simulate_edges(self.templates["close"], sequence, self.CONTEXT), 0
         )
+
+
+class TrendEarlyCloseTests(unittest.TestCase):
+    """Convergence-based early close using optional trend sensors.
+
+    difference = inside - outside. The gap is "closing" when
+    (inside_rate - outside_rate) is sufficiently negative, i.e. outside is
+    catching up to inside faster than the room is warming.
+    """
+
+    CONTEXT = {
+        "inside_entity": "sensor.inside",
+        "outside_entity": "sensor.outside",
+        "inside_trend_entity": "sensor.inside_rate",
+        "outside_trend_entity": "sensor.outside_rate",
+        "min_indoor": 22.0,
+        "open_diff": 1.0,
+        "close_diff": 0.5,
+        "converge_rate": 0.1,
+    }
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.templates = {
+            trig["id"]: trig["value_template"] for trig in doc["triggers"]
+        }
+
+    def close(self, inside, outside, inside_rate, outside_rate):
+        return render(
+            self.templates["close"],
+            inside_state=inside,
+            outside_state=outside,
+            inside_trend_state=inside_rate,
+            outside_trend_state=outside_rate,
+            context=self.CONTEXT,
+        )
+
+    def open_(self, inside, outside, inside_rate, outside_rate):
+        return render(
+            self.templates["open"],
+            inside_state=inside,
+            outside_state=outside,
+            inside_trend_state=inside_rate,
+            outside_trend_state=outside_rate,
+            context=self.CONTEXT,
+        )
+
+    def test_morning_cold_but_rising_outside_keeps_ventilating(self):
+        # Outside cold (16) and rising fast, room warm (24): big gap -> stay open,
+        # do NOT close even though the gap is technically closing.
+        self.assertTrue(self.open_("24.0", "16.0", "0.0", "2.0"))
+        self.assertFalse(self.close("24.0", "16.0", "0.0", "2.0"))
+
+    def test_converging_in_hysteresis_band_closes_early(self):
+        # diff 0.8 (in the 0.5-1.0 gap) and outside catching up -> early close.
+        self.assertFalse(self.open_("22.8", "22.0", "0.0", "1.0"))
+        self.assertTrue(self.close("22.8", "22.0", "0.0", "1.0"))
+
+    def test_room_warming_but_outside_still_cooler_stays_open(self):
+        # diff 0.8 but the gap is GROWING (room warming, outside steady):
+        # ventilation is still winning, so do not close early.
+        self.assertFalse(self.close("22.8", "22.0", "1.0", "0.0"))
+
+    def test_slow_convergence_below_rate_does_not_close(self):
+        # Gap closing but slower than the minimum convergence rate (0.1/h).
+        self.assertFalse(self.close("22.8", "22.0", "0.0", "0.05"))
+
+    def test_equilibrium_still_closes_without_trend_help(self):
+        # Base close still works regardless of trend direction.
+        self.assertTrue(self.close("22.4", "22.0", "-5.0", "-5.0"))
+
+    def test_early_close_not_triggered_above_open_band(self):
+        # diff 1.5 is in the open band: never an early close there.
+        self.assertFalse(self.close("23.5", "22.0", "0.0", "5.0"))
+
+    def test_invalid_trend_sensor_falls_back_to_temperature_only(self):
+        # A broken trend sensor must not enable early close, and must not error.
+        self.assertFalse(self.close("22.8", "22.0", "unavailable", "unknown"))
+        # ...but the base equilibrium close still works.
+        self.assertTrue(self.close("22.4", "22.0", "unavailable", "unknown"))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,13 @@
 Tracking ideas for future releases. The first release (`0.1.0`) is intentionally
 scoped to the temperature-only passive-cooling use case.
 
+## Done in 0.2.0
+
+- [x] Optional trend awareness via indoor/outdoor derivative sensors.
+- [x] Convergence-based early close (close before equilibrium as the gap shuts).
+- [x] `inside_trend` / `outside_trend` / `difference_trend` action variables.
+- [x] Tests for trend behaviour and invalid-trend fallback.
+
 ## Done in 0.1.0
 
 - [x] Passive cooling window recommendation blueprint (open / close).
@@ -22,6 +29,10 @@ scoped to the temperature-only passive-cooling use case.
       re-assertion after a restart. Would keep the helper-free default while
       letting power users opt in. Resolves the two documented edge cases in the
       README "How state is tracked" section.
+- [ ] Symmetric early-OPEN: in the evening, anticipate the cool-down and start
+      ventilating slightly before the full open threshold when the gap is
+      opening up. Deliberately deferred to avoid opening into marginal/rising
+      outdoor temperatures; the instantaneous open threshold handles this today.
 - [ ] Optional "current recommendation" sensor/attribute for dashboards.
 - [ ] Per-recommendation stability durations (separate open vs close timing).
 - [ ] Soft validation/warning when the open threshold is not greater than the
