@@ -1,0 +1,19 @@
+# yamllint configuration for the passive cooling blueprint repository.
+# Home Assistant blueprints use long descriptive strings, so line-length is
+# relaxed to a warning.
+extends: default
+
+rules:
+  line-length:
+    max: 120
+    level: warning
+  document-start:
+    present: false
+  truthy:
+    # Allow Home Assistant's on/off style values without warnings.
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+
+ignore: |
+  .git/
