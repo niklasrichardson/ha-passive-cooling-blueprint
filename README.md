@@ -26,6 +26,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
+- [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -190,6 +191,31 @@ safely falls back to the plain equilibrium close.
 > outside is genuinely cooler — without the risk of opening early into marginal
 > or still-rising outdoor air. Symmetric *early open* is noted in `TODO.md` as a
 > possible future option.
+
+## Sharing settings across rooms (global overrides)
+
+If you run many automations and don't want to edit each one when you tune a
+threshold, point them at a **shared helper**. The optional *Global overrides*
+section accepts a helper entity (typically an `input_number`) for each of:
+
+- minimum indoor temperature,
+- open-window difference,
+- close-window difference,
+- minimum convergence rate,
+- stability duration (interpreted in **minutes**).
+
+The effective value for each setting is resolved as:
+
+1. **Global helper** — if you link one and it holds a valid number, it wins.
+2. **Per-automation number** — the value on the form, otherwise.
+3. **Blueprint default** — baked into that number field.
+
+So set a helper once (e.g. `input_number.passive_cooling_min_indoor_temp`), link
+it in every room, and changing the helper updates them all — they pick up the
+new value on the next trigger evaluation. To make one room differ, just leave its
+global blank and use the number field. An invalid or unavailable helper safely
+falls back to the per-automation number, so a broken helper never stops the
+automation.
 
 ## How state is tracked
 

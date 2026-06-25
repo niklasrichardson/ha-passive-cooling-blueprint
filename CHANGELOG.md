@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-25
+
+### Added
+
+- **Global overrides for shared settings.** A new optional *Global overrides*
+  section lets each setting point at a shared helper entity (typically an
+  `input_number`): minimum indoor temperature, open/close difference, minimum
+  convergence rate, and stability duration (in minutes). When a global helper is
+  linked and holds a valid number it overrides the per-automation value, so a
+  fleet of rooms can be tuned from one helper.
+- Tests for the override precedence and safe fallback when a global helper is
+  blank or invalid.
+
+### Changed
+
+- Each globalisable setting now resolves its effective value as: linked global
+  helper (when valid) → per-automation number → blueprint default. The action
+  variables (`minimum_indoor_temperature`, `open_threshold`, `close_threshold`)
+  reflect the effective value in use.
+- The trigger `for:` (stability duration) is now templated so it can read from
+  the optional global stability-duration helper; a blank or invalid helper falls
+  back to the per-automation duration.
+
+### Notes
+
+- All global sources are optional and off by default; leaving them blank
+  reproduces 0.3.0 behaviour exactly.
+
 ## [0.3.0] - 2026-06-25
 
 ### Added
@@ -93,6 +121,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.4.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.4.0
 [0.3.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.3.0
 [0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.1.0
