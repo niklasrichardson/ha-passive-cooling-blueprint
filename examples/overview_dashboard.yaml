@@ -28,15 +28,20 @@ views:
       - type: grid
         title: Rooms
         cards:
+          # Tiles point at the template binary_sensors (device_class: window):
+          # Open/Closed state, a window icon, state colour, and the room
+          # temperature via state_content.
           - type: tile
-            entity: sensor.master_bedroom_recommendation
+            entity: binary_sensor.master_bedroom_windows
             name: Master Bedroom
+            color: green
             state_content:
               - state
               - temperature
           - type: tile
-            entity: sensor.study_recommendation
+            entity: binary_sensor.study_windows
             name: Study
+            color: green
             state_content:
               - state
               - temperature

@@ -228,10 +228,10 @@ addition to your normal actions).
 
 - Create one `input_boolean` per room and link it under *Recommendation output*.
 - For a polished, fully-native board, mirror each `input_boolean` with a template
-  sensor exposing an **`Open`/`Close`** state, a window icon, and the room
-  temperature as an attribute — a single tile then shows the recommendation and
-  the temperature together. See [`examples/`](./examples) for ready-to-paste
-  helpers and a tile dashboard (with an outside-temperature tile).
+  `binary_sensor` (`device_class: window`): tiles show **Open/Closed**, a window
+  icon, state-based colour, and the room temperature (carried as an attribute) —
+  all on one tile, no custom cards. See [`examples/`](./examples) for
+  ready-to-paste helpers and a tile dashboard (with an outside-temperature tile).
 
 Because the recommendation only changes on the open/close edges, the helper
 holds the **current standing recommendation** (on = open, off = close). There is

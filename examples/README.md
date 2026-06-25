@@ -123,9 +123,10 @@ status board with native tile cards — no custom cards required.
 per room:
 
 1. an **`input_boolean`** the automation writes to (on = open recommended), and
-2. a **template sensor** that reads it and exposes a tidy **`Open`/`Close`**
-   state, a window icon that flips with the recommendation, and the room's
-   current **temperature** as an attribute.
+2. a **template `binary_sensor`** with `device_class: window` that mirrors it.
+   The window device class gives the tile an **Open/Closed** state, a window icon
+   that changes with state, and **state-based colour**; it also carries the
+   room's current **temperature** as an attribute.
 
 Then:
 
@@ -135,14 +136,8 @@ Then:
    (optional)*.
 3. Add [`overview_dashboard.yaml`](./overview_dashboard.yaml): a prominent
    outside-temperature tile, then one tile per room showing the recommendation
-   and the room temperature together (via the tile's `state_content`).
-
-> Wording vs colour trade-off: this template-sensor approach gives exact
-> `Open`/`Close` text plus the temperature on one tile, with the open/closed
-> window icon showing state. If you'd rather have automatic state *colour*
-> (green when open), use a template `binary_sensor` with `device_class: window`
-> instead — but its state reads "Open"/"**Closed**" and can't carry the
-> temperature on the same tile.
+   (Open/Closed, lit green when open) and the room temperature together (via the
+   tile's `state_content`).
 
 Because the recommendation only changes on the open/close edges, the helper
 holds the **current standing recommendation** — there is no separate "no action"
