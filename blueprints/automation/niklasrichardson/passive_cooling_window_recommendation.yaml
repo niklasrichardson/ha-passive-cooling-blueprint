@@ -13,6 +13,14 @@ blueprint:
     sensor readings fluctuate around a single value.
 
 
+    Optionally, provide rate-of-change (derivative) sensors for the indoor and
+    outdoor temperatures. When the temperature gap is actively closing toward
+    equilibrium, the blueprint recommends closing the windows EARLY to lock in
+    the cooler air before the room warms back up - useful as morning
+    temperatures rise. Leave the trend sensors blank for purely
+    instantaneous, temperature-only behaviour.
+
+
     One automation = one room. Create a separate automation per room.
 
 
@@ -118,6 +126,50 @@ blueprint:
             minutes: 5
           selector:
             duration: {}
+    trend_section:
+      name: Trend awareness (optional)
+      icon: mdi:trending-up
+      collapsed: true
+      input:
+        inside_temperature_trend:
+          name: Indoor temperature trend sensor (optional)
+          description: >-
+            A sensor reporting the rate of change of the indoor temperature, in
+            degrees per hour (for example a Derivative helper with unit_time set
+            to hours). Used only for the early-close behaviour. Leave blank to
+            disable trend awareness.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        outside_temperature_trend:
+          name: Outdoor temperature trend sensor (optional)
+          description: >-
+            A sensor reporting the rate of change of the outdoor temperature, in
+            degrees per hour. Leave blank to disable trend awareness. Provide
+            both trend sensors for the most accurate result.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+        minimum_convergence_rate:
+          name: Minimum convergence rate
+          description: >-
+            How fast the indoor/outdoor gap must be closing, in degrees per
+            hour, before an early close is recommended. The gap is closing when
+            the outdoor temperature is catching up to indoors faster than the
+            room itself is warming. A small value ignores sensor noise. Only
+            used when at least one trend sensor is configured.
+          default: 0.1
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
+              step: 0.1
+              unit_of_measurement: "°/h"
+              mode: box
     action_section:
       name: Actions
       icon: mdi:play-box-multiple
@@ -178,6 +230,9 @@ trigger_variables:
   min_indoor: !input minimum_indoor_temperature
   open_diff: !input open_temperature_difference
   close_diff: !input close_temperature_difference
+  inside_trend_entity: !input inside_temperature_trend
+  outside_trend_entity: !input outside_temperature_trend
+  converge_rate: !input minimum_convergence_rate
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
@@ -189,6 +244,10 @@ trigger_variables:
 # The open and close bands are separated by the hysteresis gap (close_diff <
 # difference < open_diff), where neither template is true, so the current
 # recommendation simply persists.
+#
+# Trend awareness (optional) refines only the CLOSE trigger: inside the
+# hysteresis gap, if the gap is actively closing toward equilibrium, we close
+# early to lock in the cooler air before the room warms back up.
 triggers:
   - trigger: template
     id: open
@@ -204,8 +263,20 @@ triggers:
     value_template: >-
       {% set inside = states(inside_entity) %}
       {% set outside = states(outside_entity) %}
-      {{ is_number(inside) and is_number(outside)
-         and ((inside | float) - (outside | float)) <= (close_diff | float) }}
+      {% set valid = is_number(inside) and is_number(outside) %}
+      {% set diff = (inside | float(0)) - (outside | float(0)) %}
+      {# Rates of change (degrees/hour); 0 when a trend sensor is not set. #}
+      {% set has_in = is_number(states(inside_trend_entity)) %}
+      {% set has_out = is_number(states(outside_trend_entity)) %}
+      {% set inside_rate = states(inside_trend_entity) | float(0) %}
+      {% set outside_rate = states(outside_trend_entity) | float(0) %}
+      {# The gap closes when outside catches up faster than the room warms. #}
+      {% set converging = (has_in or has_out)
+         and ((inside_rate - outside_rate) <= (-1.0 * (converge_rate | float))) %}
+      {% set early_close = converging
+         and (diff > (close_diff | float))
+         and (diff < (open_diff | float)) %}
+      {{ valid and ((diff <= (close_diff | float)) or early_close) }}
     for: !input stability_duration
 
 # Variables exposed to BOTH user actions. Temperatures are numeric and ready to
@@ -214,6 +285,8 @@ variables:
   room_name: !input room_name
   inside_entity: !input inside_temperature_sensor
   outside_entity: !input outside_temperature_sensor
+  inside_trend_entity: !input inside_temperature_trend
+  outside_trend_entity: !input outside_temperature_trend
   minimum_indoor_temperature: !input minimum_indoor_temperature
   open_threshold: !input open_temperature_difference
   close_threshold: !input close_temperature_difference
@@ -222,6 +295,11 @@ variables:
   temperature_difference: >-
     {{ ((states(inside_entity) | float(0))
         - (states(outside_entity) | float(0))) | round(2) }}
+  inside_trend: "{{ states(inside_trend_entity) | float(0) }}"
+  outside_trend: "{{ states(outside_trend_entity) | float(0) }}"
+  difference_trend: >-
+    {{ ((states(inside_trend_entity) | float(0))
+        - (states(outside_trend_entity) | float(0))) | round(2) }}
   recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
 
 # Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid

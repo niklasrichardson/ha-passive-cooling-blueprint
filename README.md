@@ -25,6 +25,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
+- [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -122,6 +123,73 @@ A recommendation must hold steady for this long before its action runs (default
 `5 minutes`). This is implemented with Home Assistant's template-trigger `for:`
 option and smooths out brief sensor spikes — a single stray reading will not
 trigger a notification.
+
+## Trend awareness: early close (optional)
+
+Plain thresholds are reactive — they wait until the indoor and outdoor
+temperatures have *already* converged before recommending a close. On a typical
+summer night you ventilate to pull in cool air; as the morning sun arrives the
+outside warms and the gap shrinks. By the time the difference collapses to the
+close threshold, you may have already let the room warm back up.
+
+Give the blueprint two **rate-of-change sensors** (degrees per hour, one for
+indoors and one for outdoors) and it can close the windows *early*, as soon as
+it detects the gap is genuinely closing — locking in the cooler air before the
+room heats up again.
+
+### The rule, in plain terms
+
+Let `difference = inside − outside`. The gap is **closing** when
+
+```
+inside_trend − outside_trend  ≤  −(minimum convergence rate)
+```
+
+i.e. the outdoor temperature is catching up to indoors **faster** than the room
+itself is warming. When that is true **and** the difference is sitting inside the
+hysteresis band (between the close and open thresholds), the blueprint
+recommends closing early. This deliberately captures the cases you described:
+
+- **Morning, outside cold but rising, room still warm.** The gap is huge, so
+  even though outside is rising you keep ventilating — exactly what you want.
+  Only once the gap shrinks into the hysteresis band does the early close kick
+  in.
+- **Room warming from the sun while outside is still clearly cooler.** Here the
+  *difference is growing*, not closing, so ventilation is still winning and the
+  windows stay open. The blueprint will not close just because the indoor
+  temperature ticked up.
+- **Don't make the room hotter than it was.** Closing before full equilibrium
+  means you stop pulling in air that is no longer meaningfully cooler.
+
+The open recommendation is **unchanged** by trends — opening still happens on the
+instantaneous threshold. Trends refine only the *close* decision.
+
+### Setting up the derivative sensors
+
+Use Home Assistant's built-in [Derivative
+helper](https://www.home-assistant.io/integrations/derivative/) (*Settings →
+Devices & services → Helpers → Create helper → Derivative sensor*), or YAML:
+
+```yaml
+sensor:
+  - platform: derivative
+    source: sensor.master_bedroom_temperature
+    name: Master bedroom temperature trend
+    unit_time: h        # degrees per HOUR — important
+    time_window: "00:30:00"   # smooth over 30 min to reduce noise
+```
+
+Create one for the indoor sensor and one for the outdoor sensor, then select
+them under *Trend awareness (optional)*. **Leave them blank to disable trend
+awareness entirely** — the blueprint then behaves exactly as the
+temperature-only version. If a trend sensor is missing or invalid, the blueprint
+safely falls back to the plain equilibrium close.
+
+> **Evening "start ventilating" question.** Opening is intentionally still driven
+> by the instantaneous open threshold, so you start ventilating as soon as the
+> outside is genuinely cooler — without the risk of opening early into marginal
+> or still-rising outdoor air. Symmetric *early open* is noted in `TODO.md` as a
+> possible future option.
 
 ## How state is tracked
 
@@ -262,6 +330,9 @@ and ready to format with `| round(1)`:
 | `minimum_indoor_temperature`  | Configured minimum indoor temperature                |
 | `open_threshold`              | Configured open-window difference                    |
 | `close_threshold`             | Configured close-window difference                   |
+| `inside_trend`                | Indoor rate of change in °/h (`0` if no trend sensor)|
+| `outside_trend`               | Outdoor rate of change in °/h (`0` if no trend sensor)|
+| `difference_trend`            | `inside_trend − outside_trend` (negative = gap closing)|
 | `recommendation`              | `"Open windows"` or `"Close windows"`                |
 
 ## Example: full automation
@@ -282,6 +353,10 @@ use_blueprint:
     close_temperature_difference: 0.5
     stability_duration:
       minutes: 5
+    # Optional trend awareness — omit these three to disable early close.
+    inside_temperature_trend: sensor.master_bedroom_temperature_trend
+    outside_temperature_trend: sensor.average_outside_temperature_trend
+    minimum_convergence_rate: 0.1
     open_action:
       - action: script.notify_wrapper
         data:
@@ -305,6 +380,10 @@ use_blueprint:
   non-numeric value — are **never treated as `0`**. Neither action runs unless
   both sensors currently hold valid numbers (validated with `is_number`). A
   sensor dropping out will therefore never produce a bogus recommendation.
+- **Optional:** two rate-of-change sensors (degrees per hour) to enable
+  [early close](#trend-awareness-early-close-optional). An invalid or missing
+  trend sensor simply disables the early-close refinement; it never blocks the
+  basic open/close behaviour.
 
 ## Celsius and Fahrenheit
 
@@ -346,7 +425,8 @@ with two things to keep in mind:
 
 ## Limitations
 
-This first release is deliberately temperature-only. It does **not** consider:
+This blueprint is deliberately temperature-only (optionally using temperature
+*trends*). It does **not** consider:
 humidity (relative or absolute), weather forecasts, rain, sun position, indoor
 air quality, or occupancy (beyond optional conditions you add yourself). It does
 **not** control curtains, blinds, motorised windows, or HVAC — it only *runs the
@@ -364,8 +444,9 @@ pip install pyyaml jinja2 yamllint
 This lints the YAML and runs `tests/test_blueprint_logic.py`, which parses the
 blueprint, renders the **actual** trigger templates with Jinja2, and checks
 every scenario in the specification (open, below-minimum, hysteresis hold,
-close, invalid sensors, no-repeat, fluctuation stability, and a full
-open→close→open cycle). The same checks run in CI via
+close, invalid sensors, no-repeat, fluctuation stability, a full
+open→close→open cycle, and the trend-based early close including the morning
+cold-but-rising case and invalid-trend fallback). The same checks run in CI via
 `.github/workflows/validate.yml`.
 
 ## Credits
