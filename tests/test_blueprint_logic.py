@@ -96,6 +96,7 @@ def render(
     context,
     inside_trend_state=None,
     outside_trend_state=None,
+    extra_states=None,
 ):
     """Render a trigger value_template the way HA would and return a bool."""
     env = make_env()
@@ -109,6 +110,9 @@ def render(
         states[context["inside_trend_entity"]] = inside_trend_state
     if context.get("outside_trend_entity") and outside_trend_state is not None:
         states[context["outside_trend_entity"]] = outside_trend_state
+    # States for any global-override helper entities referenced by this scenario.
+    if extra_states:
+        states.update(extra_states)
     globals_ = dict(context)
     # An unconfigured trend input is an empty entity id; states('') -> unknown.
     globals_["states"] = lambda entity: states.get(entity, "unknown")
@@ -134,6 +138,7 @@ class BlueprintStructureTests(unittest.TestCase):
             self.assertIn("input", section, "inputs must live inside sections")
             names.update(section["input"].keys())
         expected = {
+            "room_area",
             "room_name",
             "inside_temperature_sensor",
             "outside_temperature_sensor",
@@ -144,6 +149,11 @@ class BlueprintStructureTests(unittest.TestCase):
             "inside_temperature_trend",
             "outside_temperature_trend",
             "minimum_convergence_rate",
+            "minimum_indoor_temperature_global",
+            "open_temperature_difference_global",
+            "close_temperature_difference_global",
+            "minimum_convergence_rate_global",
+            "stability_duration_global",
             "open_action",
             "close_action",
             "open_additional_conditions",
@@ -159,6 +169,30 @@ class BlueprintStructureTests(unittest.TestCase):
         for key in ("inside_temperature_trend", "outside_temperature_trend"):
             self.assertIn("default", inputs[key], key)
             self.assertEqual(inputs[key]["default"], "")
+
+    def test_room_identity_inputs_are_optional(self):
+        inputs = {}
+        for section in self.blueprint["input"].values():
+            inputs.update(section["input"])
+        # Both the area picker and the room-name override must be optional so the
+        # name can be derived from the area (or vice versa).
+        for key in ("room_area", "room_name"):
+            self.assertIn("default", inputs[key], key)
+            self.assertEqual(inputs[key]["default"], "")
+
+    def test_global_override_inputs_are_optional(self):
+        inputs = {}
+        for section in self.blueprint["input"].values():
+            inputs.update(section["input"])
+        for key in (
+            "minimum_indoor_temperature_global",
+            "open_temperature_difference_global",
+            "close_temperature_difference_global",
+            "minimum_convergence_rate_global",
+            "stability_duration_global",
+        ):
+            self.assertIn("default", inputs[key], key)
+            self.assertEqual(inputs[key]["default"], "", key)
 
     def test_temperature_sensors_filter_for_temperature(self):
         inputs = {}
@@ -189,16 +223,21 @@ class TriggerTemplateTests(unittest.TestCase):
     """Render the real trigger templates against the spec scenarios."""
 
     # Trend inputs left blank (empty entity ids) -> trend awareness disabled,
-    # i.e. the temperature-only behaviour.
+    # i.e. the temperature-only behaviour. Global-source inputs left blank
+    # (empty entity ids) -> the per-automation numbers (..._input) are used.
     CONTEXT = {
         "inside_entity": "sensor.inside",
         "outside_entity": "sensor.outside",
         "inside_trend_entity": "",
         "outside_trend_entity": "",
-        "min_indoor": 22.0,
-        "open_diff": 1.0,
-        "close_diff": 0.5,
-        "converge_rate": 0.1,
+        "min_indoor_input": 22.0,
+        "min_indoor_global": "",
+        "open_diff_input": 1.0,
+        "open_diff_global": "",
+        "close_diff_input": 0.5,
+        "close_diff_global": "",
+        "converge_rate_input": 0.1,
+        "converge_rate_global": "",
     }
 
     def setUp(self):
@@ -271,10 +310,10 @@ class TriggerTemplateTests(unittest.TestCase):
     def test_fahrenheit_scaled_thresholds(self):
         # Same logic, Fahrenheit values and a Fahrenheit-scaled threshold.
         self.assertTrue(
-            self.open_true("77.0", "72.0", min_indoor=72.0, open_diff=2.0)
+            self.open_true("77.0", "72.0", min_indoor_input=72.0, open_diff_input=2.0)
         )
         self.assertTrue(
-            self.close_true("73.0", "72.5", min_indoor=72.0, close_diff=1.0)
+            self.close_true("73.0", "72.5", min_indoor_input=72.0, close_diff_input=1.0)
         )
 
 
@@ -377,10 +416,14 @@ class TrendEarlyCloseTests(unittest.TestCase):
         "outside_entity": "sensor.outside",
         "inside_trend_entity": "sensor.inside_rate",
         "outside_trend_entity": "sensor.outside_rate",
-        "min_indoor": 22.0,
-        "open_diff": 1.0,
-        "close_diff": 0.5,
-        "converge_rate": 0.1,
+        "min_indoor_input": 22.0,
+        "min_indoor_global": "",
+        "open_diff_input": 1.0,
+        "open_diff_global": "",
+        "close_diff_input": 0.5,
+        "close_diff_global": "",
+        "converge_rate_input": 0.1,
+        "converge_rate_global": "",
     }
 
     def setUp(self):
@@ -442,6 +485,188 @@ class TrendEarlyCloseTests(unittest.TestCase):
         self.assertFalse(self.close("22.8", "22.0", "unavailable", "unknown"))
         # ...but the base equilibrium close still works.
         self.assertTrue(self.close("22.4", "22.0", "unavailable", "unknown"))
+
+
+class GlobalOverrideTests(unittest.TestCase):
+    """A configured, valid global helper overrides the per-automation number;
+    a blank or invalid global falls back to the local number."""
+
+    BASE = {
+        "inside_entity": "sensor.inside",
+        "outside_entity": "sensor.outside",
+        "inside_trend_entity": "",
+        "outside_trend_entity": "",
+        "min_indoor_input": 22.0,
+        "min_indoor_global": "",
+        "open_diff_input": 1.0,
+        "open_diff_global": "",
+        "close_diff_input": 0.5,
+        "close_diff_global": "",
+        "converge_rate_input": 0.1,
+        "converge_rate_global": "",
+    }
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.templates = {
+            trig["id"]: trig["value_template"] for trig in doc["triggers"]
+        }
+
+    def test_global_min_indoor_overrides_local(self):
+        # Local min 22 would allow opening a 25 deg room; the global helper
+        # raises the minimum to 26, which blocks it.
+        ctx = dict(self.BASE, min_indoor_global="input_number.global_min")
+        self.assertFalse(
+            render(
+                self.templates["open"],
+                inside_state="25.0",
+                outside_state="20.0",
+                context=ctx,
+                extra_states={"input_number.global_min": "26.0"},
+            )
+        )
+        # Same scenario without the global -> local 22 applies -> opens.
+        self.assertTrue(
+            render(
+                self.templates["open"],
+                inside_state="25.0",
+                outside_state="20.0",
+                context=self.BASE,
+            )
+        )
+
+    def test_global_open_diff_overrides_local(self):
+        # 3 deg gap opens under local 1.0; global raises open diff to 5 -> no open.
+        ctx = dict(self.BASE, open_diff_global="input_number.global_open")
+        self.assertFalse(
+            render(
+                self.templates["open"],
+                inside_state="25.0",
+                outside_state="22.0",
+                context=ctx,
+                extra_states={"input_number.global_open": "5.0"},
+            )
+        )
+
+    def test_global_close_diff_overrides_local(self):
+        # diff 0.8 holds under local close 0.5; global raises close to 1.0 -> closes.
+        ctx = dict(self.BASE, close_diff_global="input_number.global_close")
+        self.assertTrue(
+            render(
+                self.templates["close"],
+                inside_state="22.8",
+                outside_state="22.0",
+                context=ctx,
+                extra_states={"input_number.global_close": "1.0"},
+            )
+        )
+
+    def test_invalid_global_falls_back_to_local(self):
+        # Global linked but unavailable -> use local 1.0 -> 3 deg gap still opens.
+        ctx = dict(self.BASE, open_diff_global="input_number.global_open")
+        self.assertTrue(
+            render(
+                self.templates["open"],
+                inside_state="25.0",
+                outside_state="22.0",
+                context=ctx,
+                extra_states={"input_number.global_open": "unavailable"},
+            )
+        )
+
+    def test_global_convergence_rate_overrides_local(self):
+        # diff 0.8 (dead band), difference_trend -0.2.
+        ctx = dict(
+            self.BASE,
+            inside_trend_entity="sensor.in_rate",
+            outside_trend_entity="sensor.out_rate",
+            converge_rate_global="input_number.global_conv",
+        )
+        # Global rate 0.5: -0.2 is NOT <= -0.5 -> no early close.
+        self.assertFalse(
+            render(
+                self.templates["close"],
+                inside_state="22.8",
+                outside_state="22.0",
+                inside_trend_state="0.0",
+                outside_trend_state="0.2",
+                context=ctx,
+                extra_states={"input_number.global_conv": "0.5"},
+            )
+        )
+        # Local rate 0.1 (no global): -0.2 <= -0.1 -> early close.
+        ctx_local = dict(
+            self.BASE,
+            inside_trend_entity="sensor.in_rate",
+            outside_trend_entity="sensor.out_rate",
+        )
+        self.assertTrue(
+            render(
+                self.templates["close"],
+                inside_state="22.8",
+                outside_state="22.0",
+                inside_trend_state="0.0",
+                outside_trend_state="0.2",
+                context=ctx_local,
+            )
+        )
+
+
+class StabilityDurationForTests(unittest.TestCase):
+    """The trigger `for:` (stability duration) resolves the global helper
+    (interpreted as minutes) when set and valid, otherwise the per-automation
+    duration. Output is a whole number of seconds."""
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.fors = {trig["id"]: trig["for"] for trig in doc["triggers"]}
+
+    def render_for(self, *, stability_dur, stability_global="", extra_states=None):
+        env = make_env()
+        states = dict(extra_states or {})
+        ctx = {
+            "stability_dur": stability_dur,
+            "stability_global": stability_global,
+            "states": lambda entity: states.get(entity, "unknown"),
+            "is_number": ha_is_number,
+        }
+        out = env.from_string(self.fors["open"]).render(**ctx).strip()
+        return int(out)
+
+    def test_open_and_close_for_are_identical(self):
+        self.assertEqual(self.fors["open"], self.fors["close"])
+
+    def test_local_minutes_only_duration(self):
+        # 5 minutes -> 300 seconds; missing day/hour/second keys default to 0.
+        self.assertEqual(self.render_for(stability_dur={"minutes": 5}), 300)
+
+    def test_local_compound_duration(self):
+        self.assertEqual(
+            self.render_for(stability_dur={"hours": 1, "minutes": 2, "seconds": 3}),
+            3723,
+        )
+
+    def test_global_minutes_override_local(self):
+        self.assertEqual(
+            self.render_for(
+                stability_dur={"minutes": 5},
+                stability_global="input_number.global_stability",
+                extra_states={"input_number.global_stability": "2"},
+            ),
+            120,
+        )
+
+    def test_invalid_global_falls_back_to_local(self):
+        for bad in ("unavailable", "unknown", "none", "", "n/a"):
+            self.assertEqual(
+                self.render_for(
+                    stability_dur={"minutes": 5},
+                    stability_global="input_number.global_stability",
+                    extra_states={"input_number.global_stability": bad},
+                ),
+                300,
+                bad,
+            )
 
 
 if __name__ == "__main__":

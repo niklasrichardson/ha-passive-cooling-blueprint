@@ -41,11 +41,26 @@ blueprint:
       icon: mdi:home-thermometer
       collapsed: false
       input:
-        room_name:
-          name: Room name
+        room_area:
+          name: Room / area (optional)
           description: >-
-            A friendly name for the room. Exposed to your actions as the
-            `room_name` variable so you can use it in notification messages.
+            Pick this room's area to auto-fill the room name (via `area_name`) —
+            no need to type it below. It also helps you locate this room's
+            sensors: Home Assistant's sensor pickers further down are searchable
+            and grouped by area, so type the room name to narrow them. (A
+            blueprint cannot auto-filter those pickers to the chosen area; that
+            reactive filtering is not available to blueprints.) Leave blank to
+            name the room manually instead.
+          default: ""
+          selector:
+            area: {}
+        room_name:
+          name: Room name (optional if an area is selected)
+          description: >-
+            A friendly name for the room, exposed to your actions as the
+            `room_name` variable. Leave blank to use the selected area's name
+            automatically; set it to override that name.
+          default: ""
           selector:
             text: {}
         inside_temperature_sensor:
@@ -177,21 +192,130 @@ blueprint:
       input:
         open_action:
           name: Open-windows action
-          description: >-
-            Runs once when opening windows is first recommended. Use any
-            action: a notification, TTS, a script, a light, etc. The variables
-            room_name, inside_temperature, outside_temperature,
-            temperature_difference, recommendation and the threshold values are
-            available inside templates.
+          description: |
+            Runs once when opening windows is first recommended. Use any action:
+            a notification, TTS, a script, a light, etc.
+
+            Available template variables: `room_name`, `inside_temperature`,
+            `outside_temperature`, `temperature_difference`, `recommendation`,
+            `minimum_indoor_temperature`, `open_threshold`, `close_threshold`,
+            `inside_trend`, `outside_trend`, `difference_trend`.
+
+            Example — a mobile notification (replace `notify.notify` with your
+            own service, e.g. `notify.mobile_app_<your_phone>`):
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🪟 Open windows in {{ room_name }}"
+                message: >-
+                  {{ room_name }} is {{ inside_temperature | round(1) }}° inside
+                  and {{ outside_temperature | round(1) }}° outside
+                  ({{ temperature_difference | round(1) }}° cooler out) —
+                  open up to cool it down.
+            ```
           selector:
             action: {}
         close_action:
           name: Close-windows action
-          description: >-
+          description: |
             Runs once when the recommendation changes to closing windows. The
-            same variables are available as for the open action.
+            same template variables are available as for the open action.
+
+            Example — a mobile notification (replace `notify.notify` with your
+            own service):
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🌡️ Close windows in {{ room_name }}"
+                message: >-
+                  {{ room_name }} is {{ inside_temperature | round(1) }}° inside
+                  and {{ outside_temperature | round(1) }}° outside
+                  ({{ temperature_difference | round(1) }}° cooler out) —
+                  close up to keep the cool in.
+            ```
           selector:
             action: {}
+    globals_thresholds_section:
+      name: Global overrides — thresholds & timing (optional)
+      icon: mdi:earth
+      collapsed: true
+      input:
+        minimum_indoor_temperature_global:
+          name: Minimum indoor temperature — global source (optional)
+          description: >-
+            Optional. Point this at a helper (typically an input_number) holding
+            a shared minimum indoor temperature. When set and valid it OVERRIDES
+            the per-automation number, so you can change one helper instead
+            of editing every automation. Leave blank to use the number on the
+            form. Changes to the helper take effect on the next trigger
+            evaluation.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
+        open_temperature_difference_global:
+          name: Open-window difference — global source (optional)
+          description: >-
+            Optional shared source for the open-window temperature difference.
+            Overrides the per-automation number when set and valid. Leave blank
+            to use the number on the form.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
+        close_temperature_difference_global:
+          name: Close-window difference — global source (optional)
+          description: >-
+            Optional shared source for the close-window temperature difference.
+            Overrides the per-automation number when set and valid. Leave blank
+            to use the number on the form.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
+        stability_duration_global:
+          name: Stability duration (minutes) — global source (optional)
+          description: >-
+            Optional shared source for the stability duration, interpreted in
+            MINUTES (an input_number set to 5 means 5 minutes). Overrides the
+            per-automation duration when set and valid. Leave blank to use the
+            duration on the form. An invalid helper falls back to that duration.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
+    globals_trend_section:
+      name: Global overrides — trend awareness (optional)
+      icon: mdi:earth
+      collapsed: true
+      input:
+        minimum_convergence_rate_global:
+          name: Minimum convergence rate — global source (optional)
+          description: >-
+            Optional shared source for the minimum convergence rate (degrees per
+            hour). Overrides the per-automation number when set and valid. Leave
+            blank to use the number on the form.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
     advanced_section:
       name: Additional conditions (optional)
       icon: mdi:filter-cog
@@ -227,12 +351,21 @@ max_exceeded: silent
 trigger_variables:
   inside_entity: !input inside_temperature_sensor
   outside_entity: !input outside_temperature_sensor
-  min_indoor: !input minimum_indoor_temperature
-  open_diff: !input open_temperature_difference
-  close_diff: !input close_temperature_difference
   inside_trend_entity: !input inside_temperature_trend
   outside_trend_entity: !input outside_temperature_trend
-  converge_rate: !input minimum_convergence_rate
+  # Each setting has a per-automation number (..._input) and an optional global
+  # source entity id (..._global). The templates below resolve the effective
+  # value: the global helper when set and valid, otherwise the local number.
+  min_indoor_input: !input minimum_indoor_temperature
+  min_indoor_global: !input minimum_indoor_temperature_global
+  open_diff_input: !input open_temperature_difference
+  open_diff_global: !input open_temperature_difference_global
+  close_diff_input: !input close_temperature_difference
+  close_diff_global: !input close_temperature_difference_global
+  converge_rate_input: !input minimum_convergence_rate
+  converge_rate_global: !input minimum_convergence_rate_global
+  stability_dur: !input stability_duration
+  stability_global: !input stability_duration_global
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
@@ -254,10 +387,22 @@ triggers:
     value_template: >-
       {% set inside = states(inside_entity) %}
       {% set outside = states(outside_entity) %}
+      {% set min_indoor = (states(min_indoor_global) | float)
+         if (min_indoor_global and is_number(states(min_indoor_global)))
+         else (min_indoor_input | float) %}
+      {% set open_diff = (states(open_diff_global) | float)
+         if (open_diff_global and is_number(states(open_diff_global)))
+         else (open_diff_input | float) %}
       {{ is_number(inside) and is_number(outside)
-         and (inside | float) >= (min_indoor | float)
-         and ((inside | float) - (outside | float)) >= (open_diff | float) }}
-    for: !input stability_duration
+         and (inside | float) >= min_indoor
+         and ((inside | float) - (outside | float)) >= open_diff }}
+    for: >-
+      {{ ((states(stability_global) | float) * 60) | int
+         if (stability_global and is_number(states(stability_global)))
+         else ((stability_dur.get('days', 0) | int) * 86400
+               + (stability_dur.get('hours', 0) | int) * 3600
+               + (stability_dur.get('minutes', 0) | int) * 60
+               + (stability_dur.get('seconds', 0) | int)) }}
   - trigger: template
     id: close
     value_template: >-
@@ -265,6 +410,16 @@ triggers:
       {% set outside = states(outside_entity) %}
       {% set valid = is_number(inside) and is_number(outside) %}
       {% set diff = (inside | float(0)) - (outside | float(0)) %}
+      {# Effective thresholds: global helper when set and valid, else local. #}
+      {% set open_diff = (states(open_diff_global) | float)
+         if (open_diff_global and is_number(states(open_diff_global)))
+         else (open_diff_input | float) %}
+      {% set close_diff = (states(close_diff_global) | float)
+         if (close_diff_global and is_number(states(close_diff_global)))
+         else (close_diff_input | float) %}
+      {% set converge_rate = (states(converge_rate_global) | float)
+         if (converge_rate_global and is_number(states(converge_rate_global)))
+         else (converge_rate_input | float) %}
       {# Rates of change (degrees/hour); 0 when a trend sensor is not set. #}
       {% set has_in = is_number(states(inside_trend_entity)) %}
       {% set has_out = is_number(states(outside_trend_entity)) %}
@@ -272,24 +427,53 @@ triggers:
       {% set outside_rate = states(outside_trend_entity) | float(0) %}
       {# The gap closes when outside catches up faster than the room warms. #}
       {% set converging = (has_in or has_out)
-         and ((inside_rate - outside_rate) <= (-1.0 * (converge_rate | float))) %}
+         and ((inside_rate - outside_rate) <= (-1.0 * converge_rate)) %}
       {% set early_close = converging
-         and (diff > (close_diff | float))
-         and (diff < (open_diff | float)) %}
-      {{ valid and ((diff <= (close_diff | float)) or early_close) }}
-    for: !input stability_duration
+         and (diff > close_diff)
+         and (diff < open_diff) %}
+      {{ valid and ((diff <= close_diff) or early_close) }}
+    for: >-
+      {{ ((states(stability_global) | float) * 60) | int
+         if (stability_global and is_number(states(stability_global)))
+         else ((stability_dur.get('days', 0) | int) * 86400
+               + (stability_dur.get('hours', 0) | int) * 3600
+               + (stability_dur.get('minutes', 0) | int) * 60
+               + (stability_dur.get('seconds', 0) | int)) }}
 
 # Variables exposed to BOTH user actions. Temperatures are numeric and ready to
 # format, e.g. {{ inside_temperature | round(1) }}.
 variables:
-  room_name: !input room_name
+  room_area: !input room_area
+  room_name_input: !input room_name
+  # Prefer the explicit name; otherwise fall back to the selected area's name;
+  # otherwise a generic label. area_name() returns None for a blank/invalid id.
+  room_name: >-
+    {{ room_name_input if room_name_input
+       else (area_name(room_area) or 'the room' if room_area else 'the room') }}
   inside_entity: !input inside_temperature_sensor
   outside_entity: !input outside_temperature_sensor
   inside_trend_entity: !input inside_temperature_trend
   outside_trend_entity: !input outside_temperature_trend
-  minimum_indoor_temperature: !input minimum_indoor_temperature
-  open_threshold: !input open_temperature_difference
-  close_threshold: !input close_temperature_difference
+  min_indoor_input: !input minimum_indoor_temperature
+  min_indoor_global: !input minimum_indoor_temperature_global
+  open_diff_input: !input open_temperature_difference
+  open_diff_global: !input open_temperature_difference_global
+  close_diff_input: !input close_temperature_difference
+  close_diff_global: !input close_temperature_difference_global
+  # Effective thresholds exposed to actions: global helper when set and valid,
+  # otherwise the per-automation number (matching the trigger logic).
+  minimum_indoor_temperature: >-
+    {{ (states(min_indoor_global) | float)
+       if (min_indoor_global and is_number(states(min_indoor_global)))
+       else (min_indoor_input | float) }}
+  open_threshold: >-
+    {{ (states(open_diff_global) | float)
+       if (open_diff_global and is_number(states(open_diff_global)))
+       else (open_diff_input | float) }}
+  close_threshold: >-
+    {{ (states(close_diff_global) | float)
+       if (close_diff_global and is_number(states(close_diff_global)))
+       else (close_diff_input | float) }}
   inside_temperature: "{{ states(inside_entity) | float(0) }}"
   outside_temperature: "{{ states(outside_entity) | float(0) }}"
   temperature_difference: >-

@@ -26,6 +26,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
+- [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -191,6 +192,31 @@ safely falls back to the plain equilibrium close.
 > or still-rising outdoor air. Symmetric *early open* is noted in `TODO.md` as a
 > possible future option.
 
+## Sharing settings across rooms (global overrides)
+
+If you run many automations and don't want to edit each one when you tune a
+threshold, point them at a **shared helper**. The optional *Global overrides*
+section accepts a helper entity (typically an `input_number`) for each of:
+
+- minimum indoor temperature,
+- open-window difference,
+- close-window difference,
+- minimum convergence rate,
+- stability duration (interpreted in **minutes**).
+
+The effective value for each setting is resolved as:
+
+1. **Global helper** — if you link one and it holds a valid number, it wins.
+2. **Per-automation number** — the value on the form, otherwise.
+3. **Blueprint default** — baked into that number field.
+
+So set a helper once (e.g. `input_number.passive_cooling_min_indoor_temp`), link
+it in every room, and changing the helper updates them all — they pick up the
+new value on the next trigger evaluation. To make one room differ, just leave its
+global blank and use the number field. An invalid or unavailable helper safely
+falls back to the per-automation number, so a broken helper never stops the
+automation.
+
 ## How state is tracked
 
 The automation must run an action only when the recommendation **changes**, and
@@ -264,8 +290,15 @@ several automations from the same blueprint:
 1. *Settings → Automations & scenes → Blueprints*.
 2. Find **Passive Cooling Window Recommendation** and click **Create
    Automation**.
-3. Pick that room's indoor and outdoor sensors and tune the thresholds.
-4. Repeat for the next room. Give each automation a distinct name, e.g.
+3. Optionally pick the room's **Area** — the room name is then filled in
+   automatically (via `area_name`), so you don't have to type it. Leave the
+   **Room name** field blank to use the area's name, or set it to override.
+4. Pick that room's indoor and outdoor sensors and tune the thresholds. The
+   sensor pickers are searchable and grouped by area, so type the room name to
+   narrow them quickly. (A blueprint can't auto-filter those pickers to the area
+   you chose — that reactive filtering isn't available to blueprints — but the
+   built-in search gets you there.)
+5. Repeat for the next room. Give each automation a distinct name, e.g.
    "Passive cooling — Master bedroom".
 
 You can point several rooms at the same shared outdoor sensor (for example a
@@ -277,6 +310,11 @@ The **open** and **close** actions are ordinary Home Assistant action sequences,
 chosen with an action selector — so you are not locked into notifications. Use a
 mobile notification, a TTS announcement, a script, a scene, a light, or any
 combination.
+
+> **Tip:** the open and close action fields in the blueprint editor include a
+> ready-to-paste notification example in their descriptions — copy it, swap
+> `notify.notify` for your own service, and you're done. The examples below show
+> more variations.
 
 **Mobile notification example** (open action):
 
@@ -323,7 +361,7 @@ and ready to format with `| round(1)`:
 
 | Variable                      | Meaning                                              |
 | ----------------------------- | ---------------------------------------------------- |
-| `room_name`                   | The configured room name                             |
+| `room_name`                   | Room name — the override text, else the selected area's name |
 | `inside_temperature`          | Current indoor temperature (number)                  |
 | `outside_temperature`         | Current outdoor temperature (number)                 |
 | `temperature_difference`      | `inside_temperature − outside_temperature` (number)  |
@@ -345,6 +383,9 @@ alias: Passive cooling — Master bedroom
 use_blueprint:
   path: niklasrichardson/passive_cooling_window_recommendation.yaml
   input:
+    # Pick an area to auto-name the room, or set room_name to override it.
+    # Both are optional; room_area can be omitted if you set room_name.
+    room_area: master_bedroom
     room_name: Master bedroom
     inside_temperature_sensor: sensor.master_bedroom_temperature
     outside_temperature_sensor: sensor.average_outside_temperature
@@ -448,6 +489,14 @@ close, invalid sensors, no-repeat, fluctuation stability, a full
 open→close→open cycle, and the trend-based early close including the morning
 cold-but-rising case and invalid-trend fallback). The same checks run in CI via
 `.github/workflows/validate.yml`.
+
+### Testing in Home Assistant
+
+To exercise the logic live without waiting for real weather, the
+[`examples/`](./examples) folder provides a ready-made test rig — `input_number`
+helpers you drive by hand, a standalone dashboard with one-tap scenario buttons
+and a live "predicted outcome" card, and scenes covering every open / close /
+early-close case. See [`examples/README.md`](./examples/README.md).
 
 ## Credits
 

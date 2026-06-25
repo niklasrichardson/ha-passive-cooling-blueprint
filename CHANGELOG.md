@@ -4,6 +4,65 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-25
+
+### Added
+
+- **Global overrides for shared settings.** A new optional *Global overrides*
+  section lets each setting point at a shared helper entity (typically an
+  `input_number`): minimum indoor temperature, open/close difference, minimum
+  convergence rate, and stability duration (in minutes). When a global helper is
+  linked and holds a valid number it overrides the per-automation value, so a
+  fleet of rooms can be tuned from one helper.
+- Tests for the override precedence and safe fallback when a global helper is
+  blank or invalid.
+- `examples/global_helpers.yaml` — ready-to-paste `input_number` definitions for
+  all five global override helpers.
+
+### Changed
+
+- Each globalisable setting now resolves its effective value as: linked global
+  helper (when valid) → per-automation number → blueprint default. The action
+  variables (`minimum_indoor_temperature`, `open_threshold`, `close_threshold`)
+  reflect the effective value in use.
+- The trigger `for:` (stability duration) is now templated so it can read from
+  the optional global stability-duration helper; a blank or invalid helper falls
+  back to the per-automation duration.
+
+### Notes
+
+- All global sources are optional and off by default; leaving them blank
+  reproduces 0.3.0 behaviour exactly.
+
+## [0.3.0] - 2026-06-25
+
+### Added
+
+- **Copy-paste action examples in the editor.** The open and close action inputs
+  now include a ready-to-paste `notify` example (using the `room_name` and
+  temperature variables) directly in their descriptions, so you can configure a
+  notification without leaving the blueprint editor.
+- **Optional Area input with automatic room naming.** A new optional `room_area`
+  input lets you pick the room's area; the `room_name` is then derived
+  automatically via `area_name()`. The `Room name` field becomes an optional
+  override and can be left blank.
+- **Testing rig under `examples/`.** A standalone test dashboard and a set of
+  scenes (driven by `input_number` helpers) for exercising every branch of the
+  open/close/early-close logic without waiting for real weather. See
+  `examples/README.md`.
+
+### Changed
+
+- `room_name` is now resolved at runtime: the explicit name if set, otherwise
+  the selected area's name, otherwise a generic label.
+
+### Notes
+
+- Blueprints cannot auto-filter an entity picker to a chosen area (that reactive
+  filtering is not exposed to blueprints), so the sensor pickers remain manual —
+  but Home Assistant's pickers are already searchable and grouped by area.
+- The outdoor source remains a temperature sensor (no `weather.*` entity option).
+
 ## [0.2.0] - 2026-06-24
 
 ### Added
@@ -64,5 +123,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.4.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.4.0
+[0.3.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.3.0
 [0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.1.0
