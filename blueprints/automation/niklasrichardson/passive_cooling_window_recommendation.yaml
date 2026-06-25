@@ -399,10 +399,10 @@ triggers:
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))
-         else ((stability_dur.days | int(0)) * 86400
-               + (stability_dur.hours | int(0)) * 3600
-               + (stability_dur.minutes | int(0)) * 60
-               + (stability_dur.seconds | int(0))) }}
+         else ((stability_dur.get('days', 0) | int) * 86400
+               + (stability_dur.get('hours', 0) | int) * 3600
+               + (stability_dur.get('minutes', 0) | int) * 60
+               + (stability_dur.get('seconds', 0) | int)) }}
   - trigger: template
     id: close
     value_template: >-
@@ -435,10 +435,10 @@ triggers:
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))
-         else ((stability_dur.days | int(0)) * 86400
-               + (stability_dur.hours | int(0)) * 3600
-               + (stability_dur.minutes | int(0)) * 60
-               + (stability_dur.seconds | int(0))) }}
+         else ((stability_dur.get('days', 0) | int) * 86400
+               + (stability_dur.get('hours', 0) | int) * 3600
+               + (stability_dur.get('minutes', 0) | int) * 60
+               + (stability_dur.get('seconds', 0) | int)) }}
 
 # Variables exposed to BOTH user actions. Temperatures are numeric and ready to
 # format, e.g. {{ inside_temperature | round(1) }}.

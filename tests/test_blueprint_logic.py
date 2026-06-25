@@ -612,5 +612,62 @@ class GlobalOverrideTests(unittest.TestCase):
         )
 
 
+class StabilityDurationForTests(unittest.TestCase):
+    """The trigger `for:` (stability duration) resolves the global helper
+    (interpreted as minutes) when set and valid, otherwise the per-automation
+    duration. Output is a whole number of seconds."""
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.fors = {trig["id"]: trig["for"] for trig in doc["triggers"]}
+
+    def render_for(self, *, stability_dur, stability_global="", extra_states=None):
+        env = make_env()
+        states = dict(extra_states or {})
+        ctx = {
+            "stability_dur": stability_dur,
+            "stability_global": stability_global,
+            "states": lambda entity: states.get(entity, "unknown"),
+            "is_number": ha_is_number,
+        }
+        out = env.from_string(self.fors["open"]).render(**ctx).strip()
+        return int(out)
+
+    def test_open_and_close_for_are_identical(self):
+        self.assertEqual(self.fors["open"], self.fors["close"])
+
+    def test_local_minutes_only_duration(self):
+        # 5 minutes -> 300 seconds; missing day/hour/second keys default to 0.
+        self.assertEqual(self.render_for(stability_dur={"minutes": 5}), 300)
+
+    def test_local_compound_duration(self):
+        self.assertEqual(
+            self.render_for(stability_dur={"hours": 1, "minutes": 2, "seconds": 3}),
+            3723,
+        )
+
+    def test_global_minutes_override_local(self):
+        self.assertEqual(
+            self.render_for(
+                stability_dur={"minutes": 5},
+                stability_global="input_number.global_stability",
+                extra_states={"input_number.global_stability": "2"},
+            ),
+            120,
+        )
+
+    def test_invalid_global_falls_back_to_local(self):
+        for bad in ("unavailable", "unknown", "none", "", "n/a"):
+            self.assertEqual(
+                self.render_for(
+                    stability_dur={"minutes": 5},
+                    stability_global="input_number.global_stability",
+                    extra_states={"input_number.global_stability": bad},
+                ),
+                300,
+                bad,
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
