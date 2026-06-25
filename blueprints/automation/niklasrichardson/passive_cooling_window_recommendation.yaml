@@ -41,11 +41,26 @@ blueprint:
       icon: mdi:home-thermometer
       collapsed: false
       input:
-        room_name:
-          name: Room name
+        room_area:
+          name: Room / area (optional)
           description: >-
-            A friendly name for the room. Exposed to your actions as the
-            `room_name` variable so you can use it in notification messages.
+            Pick this room's area to auto-fill the room name (via `area_name`) —
+            no need to type it below. It also helps you locate this room's
+            sensors: Home Assistant's sensor pickers further down are searchable
+            and grouped by area, so type the room name to narrow them. (A
+            blueprint cannot auto-filter those pickers to the chosen area; that
+            reactive filtering is not available to blueprints.) Leave blank to
+            name the room manually instead.
+          default: ""
+          selector:
+            area: {}
+        room_name:
+          name: Room name (optional if an area is selected)
+          description: >-
+            A friendly name for the room, exposed to your actions as the
+            `room_name` variable. Leave blank to use the selected area's name
+            automatically; set it to override that name.
+          default: ""
           selector:
             text: {}
         inside_temperature_sensor:
@@ -177,19 +192,47 @@ blueprint:
       input:
         open_action:
           name: Open-windows action
-          description: >-
-            Runs once when opening windows is first recommended. Use any
-            action: a notification, TTS, a script, a light, etc. The variables
-            room_name, inside_temperature, outside_temperature,
-            temperature_difference, recommendation and the threshold values are
-            available inside templates.
+          description: |
+            Runs once when opening windows is first recommended. Use any action:
+            a notification, TTS, a script, a light, etc.
+
+            Available template variables: `room_name`, `inside_temperature`,
+            `outside_temperature`, `temperature_difference`, `recommendation`,
+            `minimum_indoor_temperature`, `open_threshold`, `close_threshold`,
+            `inside_trend`, `outside_trend`, `difference_trend`.
+
+            Example — a mobile notification (replace `notify.notify` with your
+            own service, e.g. `notify.mobile_app_<your_phone>`):
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🪟 Open windows in {{ room_name }}"
+                message: >-
+                  {{ outside_temperature | round(1) }}° outside vs
+                  {{ inside_temperature | round(1) }}° inside
+                  ({{ temperature_difference | round(1) }}° cooler) — open up.
+            ```
           selector:
             action: {}
         close_action:
           name: Close-windows action
-          description: >-
+          description: |
             Runs once when the recommendation changes to closing windows. The
-            same variables are available as for the open action.
+            same template variables are available as for the open action.
+
+            Example — a mobile notification (replace `notify.notify` with your
+            own service):
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🌡️ Close windows in {{ room_name }}"
+                message: >-
+                  Outside has caught up — {{ outside_temperature | round(1) }}°
+                  out vs {{ inside_temperature | round(1) }}° in. Close
+                  {{ room_name }} to keep the cool in.
+            ```
           selector:
             action: {}
     advanced_section:
@@ -282,7 +325,13 @@ triggers:
 # Variables exposed to BOTH user actions. Temperatures are numeric and ready to
 # format, e.g. {{ inside_temperature | round(1) }}.
 variables:
-  room_name: !input room_name
+  room_area: !input room_area
+  room_name_input: !input room_name
+  # Prefer the explicit name; otherwise fall back to the selected area's name;
+  # otherwise a generic label. area_name() returns None for a blank/invalid id.
+  room_name: >-
+    {{ room_name_input if room_name_input
+       else (area_name(room_area) or 'the room' if room_area else 'the room') }}
   inside_entity: !input inside_temperature_sensor
   outside_entity: !input outside_temperature_sensor
   inside_trend_entity: !input inside_temperature_trend

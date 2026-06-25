@@ -134,6 +134,7 @@ class BlueprintStructureTests(unittest.TestCase):
             self.assertIn("input", section, "inputs must live inside sections")
             names.update(section["input"].keys())
         expected = {
+            "room_area",
             "room_name",
             "inside_temperature_sensor",
             "outside_temperature_sensor",
@@ -157,6 +158,16 @@ class BlueprintStructureTests(unittest.TestCase):
             inputs.update(section["input"])
         # Optional trend inputs must declare a default so they can be left blank.
         for key in ("inside_temperature_trend", "outside_temperature_trend"):
+            self.assertIn("default", inputs[key], key)
+            self.assertEqual(inputs[key]["default"], "")
+
+    def test_room_identity_inputs_are_optional(self):
+        inputs = {}
+        for section in self.blueprint["input"].values():
+            inputs.update(section["input"])
+        # Both the area picker and the room-name override must be optional so the
+        # name can be derived from the area (or vice versa).
+        for key in ("room_area", "room_name"):
             self.assertIn("default", inputs[key], key)
             self.assertEqual(inputs[key]["default"], "")
 

@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-25
+
+### Added
+
+- **Copy-paste action examples in the editor.** The open and close action inputs
+  now include a ready-to-paste `notify` example (using the `room_name` and
+  temperature variables) directly in their descriptions, so you can configure a
+  notification without leaving the blueprint editor.
+- **Optional Area input with automatic room naming.** A new optional `room_area`
+  input lets you pick the room's area; the `room_name` is then derived
+  automatically via `area_name()`. The `Room name` field becomes an optional
+  override and can be left blank.
+
+### Changed
+
+- `room_name` is now resolved at runtime: the explicit name if set, otherwise
+  the selected area's name, otherwise a generic label.
+
+### Notes
+
+- Blueprints cannot auto-filter an entity picker to a chosen area (that reactive
+  filtering is not exposed to blueprints), so the sensor pickers remain manual —
+  but Home Assistant's pickers are already searchable and grouped by area.
+- The outdoor source remains a temperature sensor (no `weather.*` entity option).
+
 ## [0.2.0] - 2026-06-24
 
 ### Added
@@ -64,5 +89,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.3.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.3.0
 [0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.1.0
