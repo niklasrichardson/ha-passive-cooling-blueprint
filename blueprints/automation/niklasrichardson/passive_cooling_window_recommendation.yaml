@@ -237,6 +237,26 @@ blueprint:
             ```
           selector:
             action: {}
+    output_section:
+      name: Recommendation output (optional)
+      icon: mdi:export
+      collapsed: true
+      input:
+        recommendation_helper:
+          name: Recommendation helper (optional)
+          description: >-
+            Optional input_boolean that reflects this room's current
+            recommendation, for dashboards. The automation turns it ON when
+            opening is recommended and OFF when closing is recommended. Because
+            the recommendation only changes on the open/close edges, the helper
+            holds the current standing recommendation (on = open, off = close).
+            Leave blank to disable. This is set in addition to — not instead of
+            — your open/close actions.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_boolean
     globals_thresholds_section:
       name: Global overrides — thresholds & timing (optional)
       icon: mdi:earth
@@ -485,6 +505,7 @@ variables:
     {{ ((states(inside_trend_entity) | float(0))
         - (states(outside_trend_entity) | float(0))) | round(2) }}
   recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
+  recommendation_helper: !input recommendation_helper
 
 # Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid
 # numbers right now. The triggers already require this, but a sensor can drop to
@@ -506,10 +527,30 @@ actions:
             id: open
           - condition: and
             conditions: !input open_additional_conditions
-        sequence: !input open_action
+        sequence:
+          # Reflect the recommendation in the optional helper (on = open), only
+          # when one is configured. choose/default runs the user action list.
+          - if:
+              - condition: template
+                value_template: "{{ recommendation_helper not in ('', none) }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: !input recommendation_helper
+          - choose: []
+            default: !input open_action
       - conditions:
           - condition: trigger
             id: close
           - condition: and
             conditions: !input close_additional_conditions
-        sequence: !input close_action
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ recommendation_helper not in ('', none) }}"
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: !input recommendation_helper
+          - choose: []
+            default: !input close_action

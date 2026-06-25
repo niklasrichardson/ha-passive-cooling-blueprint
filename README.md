@@ -27,6 +27,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Stability duration](#stability-duration)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
+- [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -216,6 +217,24 @@ new value on the next trigger evaluation. To make one room differ, just leave it
 global blank and use the number field. An invalid or unavailable helper safely
 falls back to the per-automation number, so a broken helper never stops the
 automation.
+
+## Recommendation output for dashboards (optional)
+
+The blueprint runs your open/close *actions*, but doesn't itself create an
+entity you can put on a dashboard. To get a per-room status you can show, link
+an optional **recommendation helper**: an `input_boolean` the automation turns
+**on** when opening is recommended and **off** when closing is recommended (in
+addition to your normal actions).
+
+- Create one `input_boolean` per room and link it under *Recommendation output*.
+- A native tile card lights up when the helper is on — green = open recommended,
+  grey = close. See [`examples/`](./examples) for ready-to-paste helpers and a
+  tile dashboard.
+
+Because the recommendation only changes on the open/close edges, the helper
+holds the **current standing recommendation** (on = open, off = close). There is
+no separate "no action" state — the hysteresis hold simply keeps the last
+decision. Leave the input blank to disable this entirely.
 
 ## How state is tracked
 

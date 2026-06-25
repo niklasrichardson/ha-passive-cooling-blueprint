@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-25
+
+### Added
+
+- **Optional recommendation output for dashboards.** A new `recommendation_helper`
+  input (an `input_boolean`) that the automation turns **on** when opening is
+  recommended and **off** when closing is recommended, in addition to your
+  open/close actions. Leave it blank to disable. Enables a per-room status board
+  with native tile cards.
+- `examples/recommendation_helpers.yaml` (per-room `input_boolean` definitions)
+  and a tile-based `examples/overview_dashboard.yaml`.
+- Tests asserting the helper is an optional `input_boolean` input and that the
+  open/close branches set it on/off.
+
+### Notes
+
+- The recommendation is edge-based, so the helper holds the current standing
+  recommendation (on = open, off = close); there is no separate "no action"
+  state. Optional and off by default.
+
 ## [0.4.0] - 2026-06-25
 
 ### Added
@@ -123,6 +143,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.5.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.5.0
 [0.4.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.4.0
 [0.3.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.3.0
 [0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0

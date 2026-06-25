@@ -1,0 +1,17 @@
+# Per-room recommendation helpers for the Passive Cooling Window Recommendation
+# blueprint's optional "Recommendation helper" output.
+#
+# Create one input_boolean per room and link it in that automation's
+# "Recommendation output (optional)" section. The automation turns it ON when
+# opening is recommended and OFF when closing is recommended, so a dashboard can
+# show each room's current standing recommendation (on = open, off = close).
+#
+# Install: paste into configuration.yaml (or use as a package), then restart.
+
+input_boolean:
+  passive_cooling_master_bedroom:
+    name: Passive Cooling – Master Bedroom
+    icon: mdi:window-open-variant
+  passive_cooling_study:
+    name: Passive Cooling – Study
+    icon: mdi:window-open-variant
