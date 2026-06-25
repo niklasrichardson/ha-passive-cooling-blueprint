@@ -237,8 +237,8 @@ blueprint:
             ```
           selector:
             action: {}
-    globals_section:
-      name: Global overrides (optional)
+    globals_thresholds_section:
+      name: Global overrides — thresholds & timing (optional)
       icon: mdi:earth
       collapsed: true
       input:
@@ -247,9 +247,10 @@ blueprint:
           description: >-
             Optional. Point this at a helper (typically an input_number) holding
             a shared minimum indoor temperature. When set and valid it OVERRIDES
-            the per-automation number above, so you can change one helper instead
-            of editing every automation. Leave blank to use the number above.
-            Changes to the helper take effect on the next trigger evaluation.
+            the per-automation number, so you can change one helper instead
+            of editing every automation. Leave blank to use the number on the
+            form. Changes to the helper take effect on the next trigger
+            evaluation.
           default: ""
           selector:
             entity:
@@ -261,8 +262,8 @@ blueprint:
           name: Open-window difference — global source (optional)
           description: >-
             Optional shared source for the open-window temperature difference.
-            Overrides the number above when set and valid. Leave blank to use the
-            number above.
+            Overrides the per-automation number when set and valid. Leave blank
+            to use the number on the form.
           default: ""
           selector:
             entity:
@@ -274,21 +275,8 @@ blueprint:
           name: Close-window difference — global source (optional)
           description: >-
             Optional shared source for the close-window temperature difference.
-            Overrides the number above when set and valid. Leave blank to use the
-            number above.
-          default: ""
-          selector:
-            entity:
-              filter:
-                - domain: input_number
-                - domain: number
-                - domain: sensor
-        minimum_convergence_rate_global:
-          name: Minimum convergence rate — global source (optional)
-          description: >-
-            Optional shared source for the minimum convergence rate (degrees per
-            hour). Overrides the number above when set and valid. Leave blank to
-            use the number above.
+            Overrides the per-automation number when set and valid. Leave blank
+            to use the number on the form.
           default: ""
           selector:
             entity:
@@ -301,8 +289,26 @@ blueprint:
           description: >-
             Optional shared source for the stability duration, interpreted in
             MINUTES (an input_number set to 5 means 5 minutes). Overrides the
-            duration above when set and valid. Leave blank to use the duration
-            above. An invalid helper falls back to the duration above.
+            per-automation duration when set and valid. Leave blank to use the
+            duration on the form. An invalid helper falls back to that duration.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: input_number
+                - domain: number
+                - domain: sensor
+    globals_trend_section:
+      name: Global overrides — trend awareness (optional)
+      icon: mdi:earth
+      collapsed: true
+      input:
+        minimum_convergence_rate_global:
+          name: Minimum convergence rate — global source (optional)
+          description: >-
+            Optional shared source for the minimum convergence rate (degrees per
+            hour). Overrides the per-automation number when set and valid. Leave
+            blank to use the number on the form.
           default: ""
           selector:
             entity:
