@@ -3,14 +3,16 @@
 #
 # Two parts per room:
 #   1. an input_boolean the automation writes to (on = open recommended), and
-#   2. a template binary_sensor (device_class: window) that mirrors it for a
-#      nice native dashboard tile — it shows "Open"/"Closed", a window icon that
-#      changes state, and state-based colour, all without any custom cards.
+#   2. a template sensor that reads it and exposes a tidy "Open"/"Close" state,
+#      a window icon that flips with the recommendation, and the room's current
+#      temperature as an attribute — so a single native tile can show the
+#      recommendation and the temperature together.
 #
 # Link the input_boolean in each automation's "Recommendation output (optional)"
-# section; point your dashboard tiles at the binary_sensor.
+# section; point your dashboard tiles at the template sensor.
 #
 # Install: paste into configuration.yaml (or use as a package), then restart.
+# Adjust the temperature sensor entity ids to match your rooms.
 
 input_boolean:
   passive_cooling_master_bedroom:
@@ -21,18 +23,24 @@ input_boolean:
     icon: mdi:window-open-variant
 
 template:
-  - binary_sensor:
-      - name: Master Bedroom windows
-        device_class: window
-        state: "{{ is_state('input_boolean.passive_cooling_master_bedroom', 'on') }}"
+  - sensor:
+      - name: Master Bedroom recommendation
+        state: >-
+          {{ 'Open' if is_state('input_boolean.passive_cooling_master_bedroom', 'on') else 'Close' }}
         icon: >-
           {{ 'mdi:window-open-variant'
              if is_state('input_boolean.passive_cooling_master_bedroom', 'on')
              else 'mdi:window-closed-variant' }}
-      - name: Study windows
-        device_class: window
-        state: "{{ is_state('input_boolean.passive_cooling_study', 'on') }}"
+        attributes:
+          temperature: >-
+            {{ states('sensor.master_bedroom_temperature') | float(0) | round(1) }}°
+      - name: Study recommendation
+        state: >-
+          {{ 'Open' if is_state('input_boolean.passive_cooling_study', 'on') else 'Close' }}
         icon: >-
           {{ 'mdi:window-open-variant'
              if is_state('input_boolean.passive_cooling_study', 'on')
              else 'mdi:window-closed-variant' }}
+        attributes:
+          temperature: >-
+            {{ states('sensor.study_temperature') | float(0) | round(1) }}°

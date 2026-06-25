@@ -1,10 +1,11 @@
 # Standalone "rooms" dashboard for the Passive Cooling Window Recommendation
-# blueprint. Each room shows a colored tile driven by its optional
-# recommendation helper (input_boolean): the tile lights up (green) when opening
-# is recommended and is grey when closing is recommended.
+# blueprint. A prominent outside-temperature tile, then one tile per room
+# showing the recommendation ("Open"/"Close" with a window icon) and the room's
+# current temperature together.
 #
-# Requires the per-room input_boolean helpers (see recommendation_helpers.yaml)
-# and the blueprint's "Recommendation helper" output linked in each automation.
+# Requires the per-room helpers in recommendation_helpers.yaml (the input_boolean
+# linked in each automation's "Recommendation helper" output, plus the template
+# sensor the tiles point at).
 #
 # Install: Settings -> Dashboards -> + Add dashboard -> New dashboard from
 # scratch -> open it -> Edit -> (three dots) -> Raw configuration editor ->
@@ -18,27 +19,24 @@ views:
     max_columns: 3
     sections:
       - type: grid
-        title: Recommendation
+        title: Outside
         cards:
-          # Tiles point at the template binary_sensors (device_class: window),
-          # so they show Open/Closed, a window icon, and colour by state.
-          - type: tile
-            entity: binary_sensor.master_bedroom_windows
-            name: Master Bedroom
-            color: green
-          - type: tile
-            entity: binary_sensor.study_windows
-            name: Study
-            color: green
-      - type: grid
-        title: Temperatures
-        cards:
-          - type: tile
-            entity: sensor.master_bedroom_temperature
-            name: Master Bedroom
-          - type: tile
-            entity: sensor.study_temperature
-            name: Study
           - type: tile
             entity: sensor.average_outside_temperature
-            name: Outside
+            name: Outside temperature
+            icon: mdi:home-thermometer-outline
+      - type: grid
+        title: Rooms
+        cards:
+          - type: tile
+            entity: sensor.master_bedroom_recommendation
+            name: Master Bedroom
+            state_content:
+              - state
+              - temperature
+          - type: tile
+            entity: sensor.study_recommendation
+            name: Study
+            state_content:
+              - state
+              - temperature
