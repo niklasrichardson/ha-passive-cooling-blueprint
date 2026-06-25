@@ -386,17 +386,24 @@ trigger_variables:
   converge_rate_global: !input minimum_convergence_rate_global
   stability_dur: !input stability_duration
   stability_global: !input stability_duration_global
+  rec_helper: !input recommendation_helper
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
-# false in between. That edge behaviour is what gives us "run once per change"
-# and natural de-duplication WITHOUT an external state helper:
+# false in between. That edge behaviour gives us "run once per change" and
+# natural de-duplication:
 #   * The open trigger fires when the room first qualifies for opening.
 #   * While it keeps qualifying, the template stays true and does NOT re-fire.
 #   * The close trigger fires when the difference collapses to the close band.
 # The open and close bands are separated by the hysteresis gap (close_diff <
-# difference < open_diff), where neither template is true, so the current
-# recommendation simply persists.
+# difference < open_diff), where neither template is true.
+#
+# Latch (when a recommendation helper is linked): the helper holds the current
+# standing recommendation (on = open). The open trigger is additionally gated on
+# the helper being OFF and the close trigger on it being ON, so a difference that
+# merely oscillates across a threshold (without crossing into the OTHER band)
+# cannot re-send the same recommendation. Without a helper linked, behaviour is
+# unchanged (and such oscillation can re-fire).
 #
 # Trend awareness (optional) refines only the CLOSE trigger: inside the
 # hysteresis gap, if the gap is actively closing toward equilibrium, we close
@@ -413,9 +420,13 @@ triggers:
       {% set open_diff = (states(open_diff_global) | float)
          if (open_diff_global and is_number(states(open_diff_global)))
          else (open_diff_input | float) %}
+      {# Latch: when a helper is linked, only open if not already open. #}
+      {% set has_latch = rec_helper not in ('', none) %}
+      {% set may_open = (not has_latch) or (not is_state(rec_helper, 'on')) %}
       {{ is_number(inside) and is_number(outside)
          and (inside | float) >= min_indoor
-         and ((inside | float) - (outside | float)) >= open_diff }}
+         and ((inside | float) - (outside | float)) >= open_diff
+         and may_open }}
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))
@@ -451,7 +462,10 @@ triggers:
       {% set early_close = converging
          and (diff > close_diff)
          and (diff < open_diff) %}
-      {{ valid and ((diff <= close_diff) or early_close) }}
+      {# Latch: when a helper is linked, only close if currently open. #}
+      {% set has_latch = rec_helper not in ('', none) %}
+      {% set may_close = (not has_latch) or is_state(rec_helper, 'on') %}
+      {{ valid and ((diff <= close_diff) or early_close) and may_close }}
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))

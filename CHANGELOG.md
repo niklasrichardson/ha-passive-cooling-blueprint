@@ -21,11 +21,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Tests asserting the helper is an optional `input_boolean` input and that the
   open/close branches set it on/off.
 
+- **Recommendation latch (repeat-notification fix).** When a recommendation
+  helper is linked, the open trigger is gated on the helper being off and the
+  close trigger on it being on. A difference that merely oscillates across a
+  threshold (without crossing into the other band) can no longer re-send the
+  same recommendation — fixing repeat "open" notifications on rooms sitting at
+  the open threshold. Tests simulate an oscillating room firing once (with the
+  latch) versus repeatedly (without).
+
 ### Notes
 
 - The recommendation is edge-based, so the helper holds the current standing
   recommendation (on = open, off = close); there is no separate "no action"
-  state. Optional and off by default.
+  state. Optional and off by default — without a helper linked, behaviour is
+  unchanged (and threshold oscillation can re-fire).
 
 ## [0.4.0] - 2026-06-25
 

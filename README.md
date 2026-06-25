@@ -238,6 +238,17 @@ holds the **current standing recommendation** (on = open, off = close). There is
 no separate "no action" state — the hysteresis hold simply keeps the last
 decision. Leave the input blank to disable this entirely.
 
+### It also stops repeat notifications
+
+Linking a helper does more than feed a dashboard — it **latches** the
+recommendation. The open action fires only while the helper is off and the close
+action only while it is on, so a room whose indoor/outdoor difference merely
+*oscillates across a threshold* (without crossing into the other band) can't
+re-send the same recommendation. This is the robust fix for repeated "open"
+notifications on rooms sitting right at the open threshold. Without a helper
+linked, behaviour is unchanged and such oscillation can re-fire — so linking a
+helper per room is recommended if you see repeats.
+
 ## How state is tracked
 
 The automation must run an action only when the recommendation **changes**, and
