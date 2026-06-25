@@ -1,10 +1,14 @@
 # Per-room recommendation helpers for the Passive Cooling Window Recommendation
 # blueprint's optional "Recommendation helper" output.
 #
-# Create one input_boolean per room and link it in that automation's
-# "Recommendation output (optional)" section. The automation turns it ON when
-# opening is recommended and OFF when closing is recommended, so a dashboard can
-# show each room's current standing recommendation (on = open, off = close).
+# Two parts per room:
+#   1. an input_boolean the automation writes to (on = open recommended), and
+#   2. a template binary_sensor (device_class: window) that mirrors it for a
+#      nice native dashboard tile — it shows "Open"/"Closed", a window icon that
+#      changes state, and state-based colour, all without any custom cards.
+#
+# Link the input_boolean in each automation's "Recommendation output (optional)"
+# section; point your dashboard tiles at the binary_sensor.
 #
 # Install: paste into configuration.yaml (or use as a package), then restart.
 
@@ -15,3 +19,20 @@ input_boolean:
   passive_cooling_study:
     name: Passive Cooling – Study
     icon: mdi:window-open-variant
+
+template:
+  - binary_sensor:
+      - name: Master Bedroom windows
+        device_class: window
+        state: "{{ is_state('input_boolean.passive_cooling_master_bedroom', 'on') }}"
+        icon: >-
+          {{ 'mdi:window-open-variant'
+             if is_state('input_boolean.passive_cooling_master_bedroom', 'on')
+             else 'mdi:window-closed-variant' }}
+      - name: Study windows
+        device_class: window
+        state: "{{ is_state('input_boolean.passive_cooling_study', 'on') }}"
+        icon: >-
+          {{ 'mdi:window-open-variant'
+             if is_state('input_boolean.passive_cooling_study', 'on')
+             else 'mdi:window-closed-variant' }}

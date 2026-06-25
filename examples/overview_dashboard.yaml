@@ -20,15 +20,15 @@ views:
       - type: grid
         title: Recommendation
         cards:
+          # Tiles point at the template binary_sensors (device_class: window),
+          # so they show Open/Closed, a window icon, and colour by state.
           - type: tile
-            entity: input_boolean.passive_cooling_master_bedroom
+            entity: binary_sensor.master_bedroom_windows
             name: Master Bedroom
-            icon: mdi:window-open-variant
             color: green
           - type: tile
-            entity: input_boolean.passive_cooling_study
+            entity: binary_sensor.study_windows
             name: Study
-            icon: mdi:window-open-variant
             color: green
       - type: grid
         title: Temperatures

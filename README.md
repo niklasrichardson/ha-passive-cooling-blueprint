@@ -227,9 +227,10 @@ an optional **recommendation helper**: an `input_boolean` the automation turns
 addition to your normal actions).
 
 - Create one `input_boolean` per room and link it under *Recommendation output*.
-- A native tile card lights up when the helper is on — green = open recommended,
-  grey = close. See [`examples/`](./examples) for ready-to-paste helpers and a
-  tile dashboard.
+- For a polished, fully-native board, mirror each `input_boolean` with a template
+  `binary_sensor` (`device_class: window`): tiles then show **Open/Closed**, a
+  window icon, and state-based colour with no custom cards. See
+  [`examples/`](./examples) for ready-to-paste helpers and a tile dashboard.
 
 Because the recommendation only changes on the open/close edges, the helper
 holds the **current standing recommendation** (on = open, off = close). There is

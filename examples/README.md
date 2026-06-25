@@ -117,16 +117,24 @@ to keep using the local value.
 
 The blueprint's optional **Recommendation helper** output keeps a per-room
 `input_boolean` in sync (on = open recommended, off = close), so you can build a
-status board with native tile cards.
+status board with native tile cards — no custom cards required.
 
-1. Create one `input_boolean` per room — see
-   [`recommendation_helpers.yaml`](./recommendation_helpers.yaml).
-2. In each automation, link its helper under *Recommendation output (optional)*.
-3. Add the dashboard in [`overview_dashboard.yaml`](./overview_dashboard.yaml):
-   a grid of tile cards that light up green when opening is recommended.
+[`recommendation_helpers.yaml`](./recommendation_helpers.yaml) sets up two things
+per room:
+
+1. an **`input_boolean`** the automation writes to, and
+2. a **template `binary_sensor`** with `device_class: window` that mirrors it —
+   this is what gives the dashboard a tile that shows **Open/Closed**, a window
+   icon that changes with state, and **state-based colour**, all natively.
+
+Then:
+
+1. Paste `recommendation_helpers.yaml` into your config and restart.
+2. In each automation, link its `input_boolean` under *Recommendation output
+   (optional)*.
+3. Add [`overview_dashboard.yaml`](./overview_dashboard.yaml): a grid of tile
+   cards pointed at the `binary_sensor`s, lit green when opening is recommended.
 
 Because the recommendation only changes on the open/close edges, the helper
 holds the **current standing recommendation** — there is no separate "no action"
-state (the hysteresis hold simply keeps the last decision). Native tiles show
-the state as `On`/`Off`; if you prefer the words *Open*/*Closed*, derive a
-template sensor from the `input_boolean`.
+state (the hysteresis hold simply keeps the last decision).

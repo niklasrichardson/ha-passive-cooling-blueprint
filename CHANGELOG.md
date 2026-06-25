@@ -13,8 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recommended and **off** when closing is recommended, in addition to your
   open/close actions. Leave it blank to disable. Enables a per-room status board
   with native tile cards.
-- `examples/recommendation_helpers.yaml` (per-room `input_boolean` definitions)
-  and a tile-based `examples/overview_dashboard.yaml`.
+- `examples/recommendation_helpers.yaml` (per-room `input_boolean` plus a
+  template `binary_sensor` with `device_class: window` for native Open/Closed
+  tiles with an icon and state colour) and a tile-based
+  `examples/overview_dashboard.yaml`.
 - Tests asserting the helper is an optional `input_boolean` input and that the
   open/close branches set it on/off.
 
