@@ -1,0 +1,76 @@
+# Standalone test dashboard for the Passive Cooling Window Recommendation
+# blueprint. See examples/README.md for full setup (helpers, template sensors,
+# scenes) and the test matrix.
+#
+# Install: Settings -> Dashboards -> + Add dashboard -> New dashboard from
+# scratch -> open it -> Edit -> (three dots) -> Raw configuration editor ->
+# paste this file.
+#
+# Replace `automation.passive_cooling_test_room` with your test automation's
+# entity id, and adjust the input_number / sensor ids if your helpers differ.
+
+title: Passive Cooling Test
+views:
+  - title: Test
+    path: test
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        title: Controls
+        cards:
+          - type: entities
+            title: 🎛️ Drive the test
+            entities:
+              - {entity: input_number.test_indoor_temperature, name: Indoor °}
+              - {entity: input_number.test_outdoor_temperature, name: Outdoor °}
+              - {entity: input_number.test_indoor_temperature_trend, name: Indoor trend °/h}
+              - {entity: input_number.test_outdoor_temperature_trend, name: Outdoor trend °/h}
+          - type: markdown
+            title: 🔮 Predicted outcome (live)
+            content: >
+              {% set ind = states('input_number.test_indoor_temperature')|float(0) %}
+              {% set out = states('input_number.test_outdoor_temperature')|float(0) %}
+              {% set it = states('input_number.test_indoor_temperature_trend')|float(0) %}
+              {% set ot = states('input_number.test_outdoor_temperature_trend')|float(0) %}
+              {% set diff = (ind-out)|round(2) %}
+              {% set dt = (it-ot)|round(2) %}
+              {% set open_now = ind >= 22 and diff >= 1.0 %}
+              {% set conv = dt <= -0.1 %}
+              {% set early = conv and diff > 0.5 and diff < 1.0 %}
+              {% set close_now = diff <= 0.5 or early %}
+              ## {{ '🪟 OPEN' if open_now else ('🌡️ CLOSE' if close_now else '⏸️ Hold') }}
+
+              - Difference: **{{ diff }}°**  · open ≥1.0 · close ≤0.5 · dead-band 0.5–1.0
+              - Difference trend: **{{ dt }}°/h** → {{ 'converging ✅' if conv else 'not converging' }}
+              - Min-indoor gate (≥22°): {{ 'pass' if ind >= 22 else '**BLOCKS open** ❌' }}
+              {% if close_now %}- Close path: **{{ 'EARLY (trend)' if early else 'base (equilibrium)' }}**{% endif %}
+
+      - type: grid
+        title: Scenarios
+        cards:
+          - {type: button, name: Baseline, icon: mdi:restore, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_baseline}}}
+          - {type: button, name: 1 Basic OPEN, icon: mdi:window-open, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_1_basic_open}}}
+          - {type: button, name: 2 Basic CLOSE, icon: mdi:window-closed, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_2_basic_close}}}
+          - {type: button, name: 4 Min gate, icon: mdi:thermometer-low, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_4_min_gate}}}
+          - {type: button, name: 5 Early close, icon: mdi:trending-down, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_5_early_close}}}
+          - {type: button, name: 6 Not converging, icon: mdi:trending-up, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_6_not_converging}}}
+          - {type: button, name: 7 Big gap, icon: mdi:weather-sunset-up, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_7_big_gap_converging}}}
+          - {type: button, name: 8 Noise, icon: mdi:sine-wave, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_8_noise_ignored}}}
+          - {type: button, name: 9 Just over, icon: mdi:trending-down, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_9_just_over_threshold}}}
+
+      - type: grid
+        title: Observe
+        cards:
+          - type: entities
+            title: 📡 What the blueprint sees
+            entities:
+              - {entity: sensor.test_indoor_temperature, name: Indoor sensor}
+              - {entity: sensor.test_outdoor_temperature, name: Outdoor sensor}
+              - {entity: sensor.test_indoor_temperature_trend, name: Indoor trend}
+              - {entity: sensor.test_outdoor_temperature_trend, name: Outdoor trend}
+              - {entity: automation.passive_cooling_test_room, secondary_info: last-triggered}
+          - type: logbook
+            title: 📜 Automation activity
+            target: {entity_id: automation.passive_cooling_test_room}
+            hours_to_show: 1

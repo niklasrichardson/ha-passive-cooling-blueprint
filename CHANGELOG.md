@@ -16,6 +16,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   input lets you pick the room's area; the `room_name` is then derived
   automatically via `area_name()`. The `Room name` field becomes an optional
   override and can be left blank.
+- **Testing rig under `examples/`.** A standalone test dashboard and a set of
+  scenes (driven by `input_number` helpers) for exercising every branch of the
+  open/close/early-close logic without waiting for real weather. See
+  `examples/README.md`.
 
 ### Changed
 

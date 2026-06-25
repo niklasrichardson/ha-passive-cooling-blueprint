@@ -464,6 +464,14 @@ open→close→open cycle, and the trend-based early close including the morning
 cold-but-rising case and invalid-trend fallback). The same checks run in CI via
 `.github/workflows/validate.yml`.
 
+### Testing in Home Assistant
+
+To exercise the logic live without waiting for real weather, the
+[`examples/`](./examples) folder provides a ready-made test rig — `input_number`
+helpers you drive by hand, a standalone dashboard with one-tap scenario buttons
+and a live "predicted outcome" card, and scenes covering every open / close /
+early-close case. See [`examples/README.md`](./examples/README.md).
+
 ## Credits
 
 Inspired by Adam Cornforth's

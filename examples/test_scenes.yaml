@@ -1,0 +1,80 @@
+# Test scenes for the Passive Cooling Window Recommendation blueprint.
+#
+# These drive a set of input_number helpers to exercise every branch of the
+# blueprint's logic (see examples/README.md for the full matrix and setup).
+#
+# Install: paste into scenes.yaml (or append to your existing scenes), then
+# Developer Tools -> YAML -> Reload Scenes. They then appear in the Scenes UI.
+#
+# They assume four input_number helpers named:
+#   input_number.test_indoor_temperature
+#   input_number.test_indoor_temperature_trend
+#   input_number.test_outdoor_temperature
+#   input_number.test_outdoor_temperature_trend
+# Rename here if your helpers differ.
+#
+# Note: scene entity states must be strings, hence the quotes around values.
+
+- id: pct_baseline
+  name: PCT Baseline
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "24.2"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_1_basic_open
+  name: PCT 1 Basic open
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "20.0"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_2_basic_close
+  name: PCT 2 Basic close
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "24.6"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_4_min_gate
+  name: PCT 4 Min gate
+  entities:
+    input_number.test_indoor_temperature: "21.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "15.0"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_5_early_close
+  name: PCT 5 Early close
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "24.3"
+    input_number.test_outdoor_temperature_trend: "2.0"
+- id: pct_6_not_converging
+  name: PCT 6 Not converging
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "2.0"
+    input_number.test_outdoor_temperature: "24.3"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_7_big_gap_converging
+  name: PCT 7 Big gap converging
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "20.0"
+    input_number.test_outdoor_temperature_trend: "3.0"
+- id: pct_8_noise_ignored
+  name: PCT 8 Noise ignored
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "24.3"
+    input_number.test_outdoor_temperature_trend: "0.05"
+- id: pct_9_just_over_threshold
+  name: PCT 9 Just over threshold
+  entities:
+    input_number.test_indoor_temperature: "25.0"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "24.3"
+    input_number.test_outdoor_temperature_trend: "0.2"
