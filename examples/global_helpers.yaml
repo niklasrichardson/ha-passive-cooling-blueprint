@@ -1,0 +1,68 @@
+# Global helper variables for the Passive Cooling Window Recommendation
+# blueprint. Create these once and link them in each automation's
+# "Global overrides (optional)" section so a whole fleet of rooms can be
+# tuned from one place.
+#
+# Install (either way):
+#   * Paste the `input_number:` block below into configuration.yaml, OR
+#   * Save this file as a package (e.g. packages/passive_cooling_globals.yaml)
+#     if you use the packages feature.
+# Then restart Home Assistant (or reload YAML where supported).
+#
+# Ranges/steps mirror the blueprint's own number fields. `initial` only sets the
+# starting value the first time the helper is created; afterwards the value you
+# set is restored across restarts.
+#
+# Units are cosmetic — the blueprint reads the raw number (and treats the
+# convergence rate as °/h and the stability helper as minutes).
+
+input_number:
+  passive_cooling_min_indoor_temp:
+    name: Passive Cooling – Minimum indoor temperature
+    icon: mdi:thermometer
+    min: 0
+    max: 45
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 22
+
+  passive_cooling_open_difference:
+    name: Passive Cooling – Open-window difference
+    icon: mdi:window-open-variant
+    min: 0.1
+    max: 20
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 1.0
+
+  passive_cooling_close_difference:
+    name: Passive Cooling – Close-window difference
+    icon: mdi:window-closed-variant
+    min: 0
+    max: 20
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 0.5
+
+  passive_cooling_convergence_rate:
+    name: Passive Cooling – Minimum convergence rate
+    icon: mdi:trending-down
+    min: 0
+    max: 10
+    step: 0.1
+    unit_of_measurement: "°/h"
+    mode: box
+    initial: 0.1
+
+  passive_cooling_stability_minutes:
+    name: Passive Cooling – Stability duration
+    icon: mdi:timer-sand
+    min: 0
+    max: 60
+    step: 0.5
+    unit_of_measurement: "min"
+    mode: box
+    initial: 5

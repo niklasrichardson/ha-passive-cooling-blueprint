@@ -16,6 +16,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fleet of rooms can be tuned from one helper.
 - Tests for the override precedence and safe fallback when a global helper is
   blank or invalid.
+- `examples/global_helpers.yaml` — ready-to-paste `input_number` definitions for
+  all five global override helpers.
 
 ### Changed
 

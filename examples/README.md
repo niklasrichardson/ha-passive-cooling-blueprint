@@ -93,3 +93,22 @@ rate **0.1 °/h**. `difference = indoor − outdoor`;
 
 - Set the test automation's **Stability duration** back to **5 minutes**.
 - Point your real automations at your real sensors.
+
+## Global override helpers
+
+[`global_helpers.yaml`](./global_helpers.yaml) defines the five `input_number`
+helpers for the blueprint's optional *Global overrides* section, so you can tune
+a whole fleet of rooms from one place. Paste its `input_number:` block into
+`configuration.yaml` (or use it as a package), restart, then link each helper in
+every automation:
+
+| Blueprint global field | Helper |
+| ---------------------- | ------ |
+| Minimum indoor temperature | `input_number.passive_cooling_min_indoor_temp` |
+| Open-window difference | `input_number.passive_cooling_open_difference` |
+| Close-window difference | `input_number.passive_cooling_close_difference` |
+| Minimum convergence rate | `input_number.passive_cooling_convergence_rate` |
+| Stability duration (minutes) | `input_number.passive_cooling_stability_minutes` |
+
+A linked helper overrides that automation's local number; leave a global blank
+to keep using the local value.
