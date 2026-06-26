@@ -81,3 +81,23 @@
     input_number.test_indoor_temperature_trend: "0.0"
     input_number.test_outdoor_temperature: "24.3"
     input_number.test_outdoor_temperature_trend: "0.2"
+- id: pct_10_comfort_floor
+  name: PCT 10 Comfort floor
+  # Room has cooled to/below the comfort floor (19°). Even though outside is far
+  # cooler (4.5° gap), the floor close fires so the room is not over-cooled.
+  entities:
+    input_number.test_indoor_temperature: "18.5"
+    input_number.test_indoor_temperature_trend: "0.0"
+    input_number.test_outdoor_temperature: "14.0"
+    input_number.test_outdoor_temperature_trend: "0.0"
+- id: pct_11_evening_hold
+  name: PCT 11 Evening hold
+  # The evening false-positive that v0.6.0 fixed: the room is cooling FASTER than
+  # outside under good ventilation, so the gap is closing (diff-trend negative) —
+  # but outside is still actively dropping, so closing now would cut the cool-down
+  # short. The equilibrium close is suppressed; windows stay open.
+  entities:
+    input_number.test_indoor_temperature: "21.0"
+    input_number.test_indoor_temperature_trend: "-1.5"
+    input_number.test_outdoor_temperature: "20.7"
+    input_number.test_outdoor_temperature_trend: "-0.5"

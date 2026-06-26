@@ -57,7 +57,7 @@ views:
               - Outside trend: **{{ ot }}°/h** → {{ 'warming' if ot >= rate else ('cooling' if ot <= -1.0 * rate else 'flat') }}
               - Comfort floor {{ floor }}°, re-open ≥{{ (floor + band) }}°: {{ 'pass (warm enough to open)' if ind >= (floor + band) else '**BLOCKS open** ❌' }}{{ ' · **at/below floor → close**' if floor_close else '' }}
               {% if close_now %}- Close path: **{{ 'FLOOR (comfort)' if floor_close and not (base_close or early) else ('EARLY (trend)' if early else 'base (equilibrium)') }}**{% endif %}
-              {% if hold_open and not floor_close %}- Evening hold: **suppressing equilibrium close** (still cooling, outside cooler){% endif %}
+              {% if hold_open and diff <= 0.5 and not floor_close %}- Evening hold: **suppressing equilibrium close** (still cooling, outside cooler){% endif %}
               - Latch (helper): **{{ latch }}** → open {{ 'allowed' if latch != 'on' else 'blocked (already open)' }}, close {{ 'allowed' if latch == 'on' else 'blocked (not open)' }}
 
       - type: grid
@@ -66,12 +66,14 @@ views:
           - {type: button, name: Baseline, icon: mdi:restore, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_baseline}}}
           - {type: button, name: 1 Basic OPEN, icon: mdi:window-open, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_1_basic_open}}}
           - {type: button, name: 2 Basic CLOSE, icon: mdi:window-closed, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_2_basic_close}}}
-          - {type: button, name: 4 Min gate, icon: mdi:thermometer-low, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_4_min_gate}}}
+          - {type: button, name: 4 Floor gate, icon: mdi:thermometer-low, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_4_min_gate}}}
           - {type: button, name: 5 Early close, icon: mdi:trending-down, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_5_early_close}}}
           - {type: button, name: 6 Not converging, icon: mdi:trending-up, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_6_not_converging}}}
           - {type: button, name: 7 Big gap, icon: mdi:weather-sunset-up, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_7_big_gap_converging}}}
           - {type: button, name: 8 Noise, icon: mdi:sine-wave, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_8_noise_ignored}}}
           - {type: button, name: 9 Just over, icon: mdi:trending-down, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_9_just_over_threshold}}}
+          - {type: button, name: 10 Comfort floor, icon: mdi:thermometer-chevron-down, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_10_comfort_floor}}}
+          - {type: button, name: 11 Evening hold, icon: mdi:weather-night, tap_action: {action: perform-action, perform_action: scene.turn_on, target: {entity_id: scene.pct_11_evening_hold}}}
 
       - type: grid
         title: Observe

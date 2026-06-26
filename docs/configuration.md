@@ -84,6 +84,12 @@ The threshold variables report the **effective** value in use — the linked
 [global helper](global-overrides.md) when one is set, otherwise the
 per-automation number.
 
+`difference_trend` is provided for your own action templates and logging; the
+blueprint's own close refinements key off the **absolute** `outside_trend` (and
+the raw `inside_trend`), not `difference_trend` — see
+[Trend awareness](trends.md). So a negative `difference_trend` does not by itself
+mean a close is coming.
+
 ## Example: full automation
 
 A complete automation that uses the blueprint (input names match the blueprint

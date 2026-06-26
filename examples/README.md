@@ -77,8 +77,16 @@ room re-opens only at **≥ 20°**), open **1.0°**, close **0.5°**, convergenc
 | 7 | Converging but big gap (morning) | 25.0 | 0.0 | 20.0 | 3.0 | 5.0 / −3.0 | 🪟 Open |
 | 8 | Noise ignored (sub-threshold) | 25.0 | 0.0 | 24.3 | 0.05 | 0.7 / −0.05 | Nothing |
 | 9 | Just over convergence threshold | 25.0 | 0.0 | 24.3 | 0.2 | 0.7 / −0.2 | 🌡️ Close (early) |
+| 10 | Comfort-floor close (over-cool guard) | 18.5 | 0.0 | 14.0 | 0.0 | 4.5 / — | 🌡️ Close (floor) |
+| 11 | Evening hold (outside still cooling) | 21.0 | −1.5 | 20.7 | −0.5 | 0.3 / −1.0 | ⏸️ Hold (close suppressed) |
 
 (#3 is the baseline scene, so there's no separate button for it.)
+
+Row 10 shows the two-sided comfort floor: even with outside 4.5° cooler, the room
+has reached the floor (19°), so it closes rather than over-cool. Row 11 is the
+evening false-positive v0.6.0 fixed — the room cools faster than outside (gap
+trend negative), but outside is still dropping, so the equilibrium close is held
+off and ventilation continues.
 
 ## Workflow
 
