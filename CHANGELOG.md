@@ -4,7 +4,28 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.1] - 2026-06-26
+## [0.6.0] - 2026-06-26
+
+### Added
+
+- **Comfort floor.** The minimum indoor temperature is now a *two-sided* comfort
+  floor: the blueprint recommends **closing** once the room cools to it
+  (`inside ≤ floor`) and only recommends **opening** once the room has warmed a
+  new **re-open band** above it (`inside ≥ floor + band`, default band `1.0°`, via
+  the new `comfort_reopen_band` input). The band is hysteresis so it doesn't flap
+  at the floor. This bounds the evening hold — the room is kept around the floor
+  instead of cooling indefinitely.
+- **Exhaustive scenario-matrix tests** covering every `difference` band crossed
+  with every trend regime (warming / cooling / flat × converging / widening /
+  neutral), the comfort floor and re-open band, boundaries, and the no-trend
+  cases, plus an open/close mutual-exclusion check.
+
+### Changed
+
+- **Default minimum indoor temperature lowered from `22.0` to `19.0`.**
+- The minimum indoor temperature changed from a one-sided open gate to a
+  two-sided comfort floor (see Added): opening now requires `inside ≥ floor +
+  re-open band`, and a new close fires at `inside ≤ floor`.
 
 ### Fixed
 
@@ -20,13 +41,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     cooler *and* more cooling is available — the gap widening **or** outside still
     cooling (`outside_trend ≤ −rate`) — instead of only when the gap was widening.
     So a room cooling toward a still-dropping outside keeps its windows open.
-
-### Added
-
-- **Exhaustive scenario-matrix tests** covering every `difference` band crossed
-  with every trend regime (warming / cooling / flat × converging / widening /
-  neutral), boundaries, the minimum-indoor gate, and the no-trend cases, plus an
-  open/close mutual-exclusion check.
 
 ## [0.5.0] - 2026-06-25
 

@@ -23,7 +23,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [When it recommends opening](#when-it-recommends-opening-windows)
 - [When it recommends closing](#when-it-recommends-closing-windows)
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
-- [Minimum indoor temperature](#minimum-indoor-temperature)
+- [Minimum indoor temperature (comfort floor)](#minimum-indoor-temperature-comfort-floor)
 - [Stability duration](#stability-duration)
 - [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
@@ -64,20 +64,26 @@ One automation handles one room. Add a separate automation per room.
 All of the following must hold, continuously, for the [stability
 duration](#stability-duration):
 
-1. The room is **at or above** the minimum indoor temperature (default
-   `19.0°`). No point cooling a room that is already cool.
+1. The room is **at least the re-open band above the comfort floor** (default
+   floor `19.0°` + band `1.0°`, i.e. `≥ 20.0°`). See
+   [comfort floor](#minimum-indoor-temperature-comfort-floor).
 2. The outdoor sensor is **at least the open threshold cooler** than indoors
    (default `1.0°`), i.e. `inside − outside ≥ open threshold`.
 3. Both sensors report valid numbers.
 
 ## When it recommends closing windows
 
-The close recommendation fires when, continuously for the stability duration:
+The close recommendation fires when, continuously for the stability duration,
+**either**:
 
 1. The indoor/outdoor difference has fallen to **the close threshold or less**
    (default `0.5°`), i.e. `inside − outside ≤ close threshold`. The outside air
-   is no longer meaningfully cooler.
-2. Both sensors report valid numbers.
+   is no longer meaningfully cooler; **or**
+2. The room has cooled to **the comfort floor or below** (`inside ≤ minimum
+   indoor temperature`). You've cooled enough — stop ventilating before
+   over-cooling. See [comfort floor](#minimum-indoor-temperature-comfort-floor).
+
+…and both sensors report valid numbers.
 
 ## Hysteresis: why two thresholds
 
@@ -108,17 +114,27 @@ disappears and you lose the anti-flapping protection (the blueprint will still
 run safely — it simply behaves like a single-threshold automation). The bundled
 tests and the input descriptions both call this out.
 
-## Minimum indoor temperature
+## Minimum indoor temperature (comfort floor)
 
-Cooler outside air is not a reason to open windows if the room is already
-comfortable or cold. The minimum indoor temperature gates the open
-recommendation:
+The minimum indoor temperature is a **two-sided comfort floor** — the blueprint
+keeps the room around it rather than cooling indefinitely:
+
+- It **won't open** to cool a room that is already at or near the floor — opening
+  needs the room to be at least the **re-open band** above it (default band
+  `1.0°`, so with a `19.0°` floor it opens at `≥ 20.0°`).
+- It **recommends closing** as soon as the room cools **to the floor** (`inside ≤
+  floor`), so an evening cool-down or a fast-ventilating room never over-cools
+  below comfort.
+
+The re-open band is the hysteresis that stops the recommendation flapping right
+at the floor: close at `19.0°`, and re-open only once the room drifts back up to
+`20.0°`. Enter the floor in your sensors' unit (°C or °F).
 
 ```
-Inside: 19.0°C   Outside: 16.0°C   ->  Do NOT recommend opening (room is cool)
+Inside: 19.0°C   Outside: 16.0°C   ->  Close (room is at the comfort floor)
+Inside: 19.5°C   Outside: 16.0°C   ->  Hold  (within the comfort band)
+Inside: 20.0°C   Outside: 16.0°C   ->  Open  (warm enough again, outside cooler)
 ```
-
-The minimum applies to the **open** recommendation only.
 
 ## Stability duration
 
@@ -142,9 +158,10 @@ built from a handful of well-established control and building-science ideas:
   thermostat avoids chattering around a single setpoint. Opening needs a clear
   gap; closing needs the gap to nearly vanish; in between, nothing changes.
   (→ open vs close thresholds.)
-- **A comfort gate.** The minimum indoor temperature is a lower comfort bound —
-  there is no point cooling a room that is already cool. (→ minimum indoor
-  temperature.)
+- **A comfort floor.** The minimum indoor temperature is a *two-sided* comfort
+  bound: don't open below it, and close once the room reaches it — so the room is
+  held around the floor (with a re-open band for hysteresis) rather than cooled
+  indefinitely. (→ comfort floor.)
 - **Debouncing — a low-pass filter.** The stability duration makes a
   recommendation prove itself before acting, so a single stray reading does not
   fire an action. (→ stability duration.)
@@ -159,11 +176,11 @@ built from a handful of well-established control and building-science ideas:
 Concretely, with `difference = inside − outside` (positive means outside cooler):
 
 ```
-OPEN   when  inside ≥ minimum indoor temperature
+OPEN   when  inside ≥ comfort floor + re-open band
          AND difference ≥ open threshold
-CLOSE  when  difference ≤ close threshold
-HOLD   otherwise — the hysteresis dead-band (close < difference < open),
-             where the current recommendation simply persists
+CLOSE  when  difference ≤ close threshold        (outside no longer cooler)
+          OR inside ≤ comfort floor              (cooled enough — stop)
+HOLD   otherwise — the hysteresis dead-band, where the recommendation persists
 ```
 
 **With trend sensors** (these refine the **close** only; opening is always the
@@ -507,7 +524,8 @@ use_blueprint:
     room_name: Master bedroom
     inside_temperature_sensor: sensor.master_bedroom_temperature
     outside_temperature_sensor: sensor.average_outside_temperature
-    minimum_indoor_temperature: 19
+    minimum_indoor_temperature: 19   # comfort floor
+    comfort_reopen_band: 1.0          # re-open at floor + this
     open_temperature_difference: 1
     close_temperature_difference: 0.5
     stability_duration:

@@ -144,6 +144,7 @@ class BlueprintStructureTests(unittest.TestCase):
             "inside_temperature_sensor",
             "outside_temperature_sensor",
             "minimum_indoor_temperature",
+            "comfort_reopen_band",
             "open_temperature_difference",
             "close_temperature_difference",
             "stability_duration",
@@ -266,6 +267,7 @@ class TriggerTemplateTests(unittest.TestCase):
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
         "rec_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -297,8 +299,10 @@ class TriggerTemplateTests(unittest.TestCase):
         self.assertFalse(self.close_true("25.0", "22.0"))
 
     def test_scenario_2_below_minimum(self):
+        # Below the comfort floor (22 here): never open, and close — the room is
+        # already at/below comfort, so stop ventilating.
         self.assertFalse(self.open_true("20.0", "17.0"))
-        self.assertFalse(self.close_true("20.0", "17.0"))
+        self.assertTrue(self.close_true("20.0", "17.0"))
 
     def test_scenario_3_hysteresis_band_remains_open(self):
         # diff 0.8 sits between close (0.5) and open (1.0): neither edge fires.
@@ -331,9 +335,20 @@ class TriggerTemplateTests(unittest.TestCase):
         # Exactly at the close threshold counts as close (<=).
         self.assertTrue(self.close_true("22.5", "22.0"))
 
-    def test_minimum_boundary_inclusive(self):
-        # Inside exactly at the minimum still qualifies to open.
-        self.assertTrue(self.open_true("22.0", "20.0"))
+    def test_open_requires_comfort_floor_plus_band(self):
+        # Opening requires the room to reach the comfort floor + re-open band
+        # (22 + 1 = 23 here): at exactly that it opens; just below it does not.
+        self.assertTrue(self.open_true("23.0", "20.0"))
+        self.assertFalse(self.open_true("22.9", "20.0"))
+
+    def test_comfort_floor_close(self):
+        # The room at/below the comfort floor closes regardless of outside.
+        self.assertTrue(self.close_true("22.0", "10.0"))   # at the floor
+        self.assertTrue(self.close_true("21.5", "10.0"))   # below the floor
+        # Just above the floor (still within the band), a big gap does not open
+        # and the floor close does not fire: hold.
+        self.assertFalse(self.open_true("22.5", "10.0"))
+        self.assertFalse(self.close_true("22.5", "21.0"))
 
     def test_fahrenheit_scaled_thresholds(self):
         # Same logic, Fahrenheit values and a Fahrenheit-scaled threshold.
@@ -453,6 +468,7 @@ class TrendEarlyCloseTests(unittest.TestCase):
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
         "rec_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -551,6 +567,11 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # Outside genuinely rising at/above the rate -> early close as intended.
         self.assertTrue(self.close("22.8", "22.0", "0.0", "0.1"))
 
+    def test_comfort_floor_bounds_evening_hold(self):
+        # Evening, outside still cooling (would normally hold open), but the room
+        # has reached the comfort floor (22) -> close to avoid over-cooling.
+        self.assertTrue(self.close("22.0", "20.0", "-1.0", "-1.0"))
+
 
 class GlobalOverrideTests(unittest.TestCase):
     """A configured, valid global helper overrides the per-automation number;
@@ -570,6 +591,7 @@ class GlobalOverrideTests(unittest.TestCase):
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
         "rec_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -755,6 +777,7 @@ class RecommendationLatchTests(unittest.TestCase):
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
         "rec_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -881,8 +904,11 @@ class ComprehensiveScenarioMatrixTests(unittest.TestCase):
         ("warmer/outside-cooling-fast", "22", "22.5", "0", "-2.0", False, True),
         ("warmer/steady", "22", "22.5", "0", "0", False, True),
         # Minimum-indoor gate and boundaries.
-        ("below-min/cool-room", "21", "18", "0", "0", False, False),
-        ("boundary/open-and-min-inclusive", "22", "21.0", "0", "0", True, False),
+        # Comfort floor (min 22, re-open band 1.0 -> open gate 23).
+        ("floor/below-floor-closes", "21", "18", "0", "0", False, True),
+        ("floor/at-floor-closes", "22", "10", "0", "0", False, True),
+        ("floor/in-band-holds", "22.5", "10", "0", "0", False, False),
+        ("floor/at-floor-plus-band-opens", "23", "22.0", "0", "0", True, False),
         ("boundary/close-threshold-inclusive", "25", "24.5", "0", "0", False, True),
     ]
 
@@ -892,8 +918,10 @@ class ComprehensiveScenarioMatrixTests(unittest.TestCase):
         ("dead-band-holds", "25", "24.2", False, False),
         ("close-band-closes", "25", "24.6", False, True),
         ("outside-warmer-closes", "22", "22.5", False, True),
-        ("below-min-holds", "21", "18", False, False),
-        ("open-boundary", "22", "21.0", True, False),
+        ("below-floor-closes", "21", "18", False, True),
+        ("at-floor-closes", "22", "10", False, True),
+        ("in-band-holds", "22.5", "10", False, False),
+        ("open-boundary-at-floor-plus-band", "23", "22.0", True, False),
         ("close-boundary", "25", "24.5", False, True),
     ]
 
