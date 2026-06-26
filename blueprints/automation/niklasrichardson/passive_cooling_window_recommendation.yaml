@@ -572,7 +572,9 @@ actions:
             then:
               - action: input_boolean.turn_on
                 target:
-                  entity_id: !input recommendation_helper
+                  entity_id: >-
+                    {{ [recommendation_helper]
+                       if recommendation_helper not in ('', none) else [] }}
           - choose: []
             default: !input open_action
       - conditions:
@@ -587,6 +589,8 @@ actions:
             then:
               - action: input_boolean.turn_off
                 target:
-                  entity_id: !input recommendation_helper
+                  entity_id: >-
+                    {{ [recommendation_helper]
+                       if recommendation_helper not in ('', none) else [] }}
           - choose: []
             default: !input close_action

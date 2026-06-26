@@ -212,6 +212,14 @@ class BlueprintStructureTests(unittest.TestCase):
         flat = str(branches)
         self.assertIn("input_boolean.turn_on", flat)
         self.assertIn("input_boolean.turn_off", flat)
+        # entity_id must be a TEMPLATE (string), not a bare !input. When no helper
+        # is linked the input is "", and a literal empty entity_id fails Home
+        # Assistant config validation. A template yields an empty list instead.
+        for branch in branches:
+            then_step = branch["sequence"][0]["then"][0]
+            entity_id = then_step["target"]["entity_id"]
+            self.assertIsInstance(entity_id, str, "entity_id must be a template string")
+            self.assertIn("{{", entity_id, "entity_id must be templated")
 
     def test_temperature_sensors_filter_for_temperature(self):
         inputs = {}
