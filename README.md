@@ -46,6 +46,7 @@ The full docs live in [`docs/`](docs/README.md):
 - **[Trend awareness](docs/trends.md)** — early close (morning) and evening hold + derivative sensors
 - **[Global overrides](docs/global-overrides.md)** — share settings across rooms
 - **[Dashboards](docs/dashboards.md)** — recommendation output and native Open/Closed tiles
+- **[Setup generator](docs/generator.md)** — a browser tool that writes the helpers/dashboard/automation YAML for your rooms
 - **[Testing](docs/testing.md)** — the test rig (sliders, scenarios, scenes)
 - **[Troubleshooting & limitations](docs/troubleshooting.md)**
 

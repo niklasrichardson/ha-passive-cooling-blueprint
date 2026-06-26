@@ -27,6 +27,8 @@ Start with the Quick start; reach for the rest as you need it.
   shared helpers.
 - **[Dashboards](dashboards.md)** — the optional recommendation output, native
   Open/Closed tiles, and the latch that stops repeat notifications.
+- **[Setup generator](generator.md)** — a browser tool that turns a list of your
+  rooms into ready-to-paste helpers, dashboard and automation YAML (no Python).
 
 ## Help
 

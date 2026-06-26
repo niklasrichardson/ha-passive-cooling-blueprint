@@ -17,6 +17,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **Quick start** guide (`docs/quickstart.md`) with an add-a-room checklist.
+- **Setup generator** (`docs/generator/index.html`) — a self-contained, no-build
+  browser tool that turns a list of rooms into ready-to-paste YAML (per-room
+  helpers, global helpers, overview dashboard, automation stubs). Works offline
+  by opening the file locally, and is GitHub Pages-ready (`.nojekyll` added). See
+  `docs/generator.md`.
 
 ## [0.6.0] - 2026-06-26
 

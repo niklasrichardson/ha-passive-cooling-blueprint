@@ -36,6 +36,9 @@ outside is cooler, and a "close" when they converge.
 
 ## Add another room
 
+> **Many rooms?** The [setup generator](generator.md) turns a list of your rooms
+> into ready-to-paste helpers, dashboard and automation YAML — no hand-repeating.
+
 One automation = one room. For each additional room:
 
 - [ ] Create a new automation from the blueprint.

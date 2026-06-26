@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Passive Cooling — setup generator</title>
+<style>
+  :root { color-scheme: light dark; --accent: #2e7d32; --border: #8884; --bg2: #80808018; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         max-width: 960px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
+  h1 { margin-bottom: .25rem; }
+  p.lead { margin-top: 0; opacity: .8; }
+  fieldset { border: 1px solid var(--border); border-radius: 10px; margin: 1rem 0; padding: 1rem; }
+  legend { font-weight: 700; padding: 0 .4rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .3rem .4rem; vertical-align: top; }
+  th { font-size: .8rem; opacity: .75; font-weight: 600; }
+  input[type=text] { width: 100%; padding: .4rem .5rem; border: 1px solid var(--border);
+                     border-radius: 6px; background: var(--bg2); font: inherit; }
+  input::placeholder { opacity: .5; }
+  button { font: inherit; padding: .5rem .9rem; border: 1px solid var(--border);
+           border-radius: 8px; background: var(--bg2); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; }
+  button.x { padding: .25rem .55rem; }
+  .row-actions { white-space: nowrap; }
+  label.opt { display: inline-flex; align-items: center; gap: .4rem; margin-right: 1.2rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: .6rem; }
+  .out { margin: 1rem 0; }
+  .out h3 { margin: 0 0 .35rem; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+  pre { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+        padding: .8rem; overflow: auto; white-space: pre; margin: 0; font-size: .85rem; }
+  .muted { opacity: .7; font-size: .9rem; }
+  code { background: var(--bg2); padding: .1rem .3rem; border-radius: 4px; }
+  .hidden { display: none; }
+  .note { background: var(--bg2); border-left: 3px solid var(--accent); padding: .6rem .8rem;
+          border-radius: 0 8px 8px 0; margin: 1rem 0; }
+</style>
+</head>
+<body>
+  <h1>Passive Cooling — setup generator</h1>
+  <p class="lead">Enter your rooms once and copy the ready-to-paste YAML. Runs
+  entirely in your browser — nothing is uploaded.</p>
+
+  <div class="note">
+    For the <a href="https://github.com/niklasrichardson/ha-passive-cooling-blueprint">Passive
+    Cooling Window Recommendation</a> blueprint. After generating: paste the
+    helpers into <code>configuration.yaml</code> (or a package) and restart;
+    paste the dashboard into a new dashboard's raw editor; use the automation
+    stubs as a starting point. See the
+    <a href="https://github.com/niklasrichardson/ha-passive-cooling-blueprint/blob/main/docs/dashboards.md">docs</a>.
+  </div>
+
+  <fieldset>
+    <legend>Shared outdoor sensor</legend>
+    <input type="text" id="sharedOutdoor" placeholder="sensor.average_outside_temperature"
+           value="sensor.average_outside_temperature" />
+    <p class="muted">Used as the default outdoor sensor for new rooms and for the
+    dashboard's outside-temperature tile. One outdoor sensor can serve every room.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Rooms</legend>
+    <table>
+      <thead>
+        <tr>
+          <th>Room name</th>
+          <th>Indoor sensor</th>
+          <th>Outdoor sensor</th>
+          <th>Indoor trend (optional)</th>
+          <th>Outdoor trend (optional)</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rooms"></tbody>
+    </table>
+    <div class="controls">
+      <button type="button" id="addRoom">+ Add room</button>
+      <span class="muted">Trend sensors are optional (enable early-close / evening hold).</span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Generate</legend>
+    <div class="controls">
+      <label class="opt"><input type="checkbox" id="optHelpers" checked /> Per-room helpers</label>
+      <label class="opt"><input type="checkbox" id="optGlobals" checked /> Global setting helpers</label>
+      <label class="opt"><input type="checkbox" id="optDashboard" checked /> Overview dashboard</label>
+      <label class="opt"><input type="checkbox" id="optAutomations" checked /> Automation stubs</label>
+    </div>
+    <div class="controls">
+      <button type="button" class="primary" id="generate">Generate YAML</button>
+      <span class="muted">Prefix: <code>passive_cooling_</code></span>
+    </div>
+  </fieldset>
+
+  <div id="output"></div>
+
+<script>
+"use strict";
+
+const PREFIX = "passive_cooling_";
+const roomsEl = document.getElementById("rooms");
+
+function slug(s) {
+  return (s || "").toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "room";
+}
+
+function roomRow(data) {
+  data = data || {};
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="text" class="r-name" placeholder="Master Bedroom"></td>
+    <td><input type="text" class="r-in" placeholder="sensor.master_bedroom_temperature"></td>
+    <td><input type="text" class="r-out"></td>
+    <td><input type="text" class="r-intr" placeholder="(optional)"></td>
+    <td><input type="text" class="r-outtr" placeholder="(optional)"></td>
+    <td class="row-actions"><button type="button" class="x" title="Remove">✕</button></td>`;
+  tr.querySelector(".r-name").value = data.name || "";
+  tr.querySelector(".r-in").value = data.indoor || "";
+  tr.querySelector(".r-out").value = data.outdoor || document.getElementById("sharedOutdoor").value;
+  tr.querySelector(".r-intr").value = data.intrend || "";
+  tr.querySelector(".r-outtr").value = data.outtrend || "";
+  tr.querySelector("button.x").addEventListener("click", () => tr.remove());
+  return tr;
+}
+
+function readRooms() {
+  return [...roomsEl.querySelectorAll("tr")].map(tr => ({
+    name: tr.querySelector(".r-name").value.trim(),
+    indoor: tr.querySelector(".r-in").value.trim(),
+    outdoor: tr.querySelector(".r-out").value.trim(),
+    intrend: tr.querySelector(".r-intr").value.trim(),
+    outtrend: tr.querySelector(".r-outtr").value.trim(),
+  })).filter(r => r.name && r.indoor);
+}
+
+document.getElementById("addRoom").addEventListener("click", () => roomsEl.appendChild(roomRow()));
+
+// --- generators ---------------------------------------------------------- //
+
+function genGlobals() {
+  return `input_number:
+  passive_cooling_min_indoor_temp:
+    name: Passive Cooling – Minimum indoor temperature
+    icon: mdi:thermometer
+    min: 0
+    max: 45
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 22
+  passive_cooling_open_difference:
+    name: Passive Cooling – Open-window difference
+    icon: mdi:window-open-variant
+    min: 0.1
+    max: 20
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 1.0
+  passive_cooling_close_difference:
+    name: Passive Cooling – Close-window difference
+    icon: mdi:window-closed-variant
+    min: 0
+    max: 20
+    step: 0.1
+    unit_of_measurement: "°"
+    mode: box
+    initial: 0.5
+  passive_cooling_convergence_rate:
+    name: Passive Cooling – Minimum convergence rate
+    icon: mdi:trending-down
+    min: 0
+    max: 10
+    step: 0.1
+    unit_of_measurement: "°/h"
+    mode: box
+    initial: 0.1
+  passive_cooling_stability_minutes:
+    name: Passive Cooling – Stability duration
+    icon: mdi:timer-sand
+    min: 0
+    max: 60
+    step: 0.5
+    unit_of_measurement: "min"
+    mode: box
+    initial: 5`;
+}
+
+function genHelpers(rooms) {
+  const booleans = rooms.map(r => {
+    const s = slug(r.name);
+    return `  ${PREFIX}${s}:\n    name: Passive Cooling – ${r.name}\n    icon: mdi:window-open-variant`;
+  }).join("\n");
+  const sensors = rooms.map(r => {
+    const s = slug(r.name);
+    const hb = `input_boolean.${PREFIX}${s}`;
+    return `      - name: ${r.name} windows
+        device_class: window
+        state: "{{ is_state('${hb}', 'on') }}"
+        icon: >-
+          {{ 'mdi:window-open-variant'
+             if is_state('${hb}', 'on')
+             else 'mdi:window-closed-variant' }}
+        attributes:
+          temperature: "{{ states('${r.indoor}') | float(0) | round(1) }}°"`;
+  }).join("\n");
+  return `input_boolean:\n${booleans}\n\ntemplate:\n  - binary_sensor:\n${sensors}`;
+}
+
+function genDashboard(rooms) {
+  const outside = document.getElementById("sharedOutdoor").value.trim()
+    || (rooms[0] && rooms[0].outdoor) || "sensor.average_outside_temperature";
+  const tiles = rooms.map(r => {
+    const s = slug(r.name);
+    return `          - type: tile
+            entity: binary_sensor.${s}_windows
+            name: ${r.name}
+            color: green
+            state_content:
+              - state
+              - temperature`;
+  }).join("\n");
+  return `title: Passive Cooling
+views:
+  - title: Rooms
+    path: rooms
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        title: Outside
+        cards:
+          - type: tile
+            entity: ${outside}
+            name: Outside temperature
+            icon: mdi:home-thermometer-outline
+      - type: grid
+        title: Rooms
+        cards:
+${tiles}`;
+}
+
+function genAutomations(rooms) {
+  return rooms.map(r => {
+    const s = slug(r.name);
+    const trends = [];
+    if (r.intrend) trends.push(`      inside_temperature_trend: ${r.intrend}`);
+    if (r.outtrend) trends.push(`      outside_temperature_trend: ${r.outtrend}`);
+    const trendBlock = trends.length ? "\n" + trends.join("\n") : "";
+    return `- id: ${PREFIX}${s}
+  alias: Passive cooling — ${r.name}
+  use_blueprint:
+    path: niklasrichardson/passive_cooling_window_recommendation.yaml
+    input:
+      room_name: ${r.name}
+      inside_temperature_sensor: ${r.indoor}
+      outside_temperature_sensor: ${r.outdoor}${trendBlock}
+      recommendation_helper: input_boolean.${PREFIX}${s}
+      open_action:
+        - action: notify.notify   # replace with your service
+          data:
+            title: "🪟 Open windows in {{ room_name }}"
+            message: >-
+              {{ room_name }} is {{ inside_temperature | round(1) }}° inside
+              and {{ outside_temperature | round(1) }}° outside
+              ({{ temperature_difference | round(1) }}° cooler out) —
+              open up to cool it down.
+      close_action:
+        - action: notify.notify   # replace with your service
+          data:
+            title: "🌡️ Close windows in {{ room_name }}"
+            message: >-
+              {{ room_name }} is {{ inside_temperature | round(1) }}° inside
+              and {{ outside_temperature | round(1) }}° outside
+              ({{ temperature_difference | round(1) }}° cooler out) —
+              close up to keep the cool in.`;
+  }).join("\n\n");
+}
+
+function block(title, hint, yaml) {
+  const wrap = document.createElement("div");
+  wrap.className = "out";
+  const id = "ta-" + Math.abs(title.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+  wrap.innerHTML = `<h3>${title} <button type="button" data-copy="${id}">Copy</button></h3>
+    ${hint ? `<p class="muted">${hint}</p>` : ""}<pre id="${id}"></pre>`;
+  wrap.querySelector("pre").textContent = yaml;
+  wrap.querySelector("button[data-copy]").addEventListener("click", (e) => {
+    navigator.clipboard.writeText(yaml).then(() => {
+      const b = e.target; const t = b.textContent; b.textContent = "Copied!";
+      setTimeout(() => (b.textContent = t), 1200);
+    });
+  });
+  return wrap;
+}
+
+document.getElementById("generate").addEventListener("click", () => {
+  const out = document.getElementById("output");
+  out.innerHTML = "";
+  const rooms = readRooms();
+  if (!rooms.length) {
+    out.innerHTML = `<p class="muted">Add at least one room (name + indoor sensor).</p>`;
+    return;
+  }
+  if (document.getElementById("optGlobals").checked) {
+    out.appendChild(block("Global setting helpers",
+      "Paste into configuration.yaml (or a package), then restart. Emit once.",
+      genGlobals()));
+  }
+  if (document.getElementById("optHelpers").checked) {
+    out.appendChild(block("Per-room helpers",
+      "Paste into configuration.yaml (or a package), then restart. Merge the input_boolean: / template: keys with any you already have.",
+      genHelpers(rooms)));
+  }
+  if (document.getElementById("optDashboard").checked) {
+    out.appendChild(block("Overview dashboard",
+      "Settings → Dashboards → + Add dashboard → New from scratch → Edit → ⋮ → Raw configuration editor → paste.",
+      genDashboard(rooms)));
+  }
+  if (document.getElementById("optAutomations").checked) {
+    out.appendChild(block("Automation stubs",
+      "A starting point per room. Link each recommendation_helper in the editor, and replace notify.notify with your service.",
+      genAutomations(rooms)));
+  }
+});
+
+// seed with two example rooms
+roomsEl.appendChild(roomRow({ name: "Master Bedroom", indoor: "sensor.master_bedroom_temperature" }));
+roomsEl.appendChild(roomRow({ name: "Study", indoor: "sensor.study_temperature" }));
+</script>
+</body>
+</html>

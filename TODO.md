@@ -13,6 +13,8 @@ scoped to the temperature-only passive-cooling use case.
       notifications from threshold oscillation. (0.5.0)
 - [x] Evening cool-down: trend-aware suppression of the equilibrium close when
       the gap is widening while outside is still cooler. (0.5.0)
+- [x] Docs restructured into a `docs/` set; quick start; browser-based setup
+      generator (no Python). (Unreleased)
 
 ## Done in 0.2.0
 
@@ -43,8 +45,8 @@ scoped to the temperature-only passive-cooling use case.
 - [ ] Soft validation/warning when the open threshold is not greater than the
       close threshold (currently only documented).
 - [ ] HACS metadata for distribution.
-- [ ] Easy-deploy generator + quickstart (per-room helpers / sensors / dashboard
-      from a simple room list).
+- [ ] HA config-check in CI (instantiate the blueprint with all-optional-blank
+      and all-set, run `check_config`) — catches "valid YAML, invalid HA config".
 
 ## Explicitly out of scope (per project requirements)
 

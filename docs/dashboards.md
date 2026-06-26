@@ -17,6 +17,10 @@ See [`examples/`](../examples) for ready-to-paste helpers
 tile dashboard ([`overview_dashboard.yaml`](../examples/overview_dashboard.yaml),
 with an outside-temperature tile and per-room recommendation + temperature tiles).
 
+> **Tip:** the [setup generator](generator.md) builds these helpers, the
+> dashboard, and automation stubs for all your rooms from a simple list — no
+> hand-editing per room.
+
 Because the recommendation only changes on the open/close edges, the helper holds
 the **current standing recommendation** (on = open, off = close). There is no
 separate "no action" state — the hysteresis hold simply keeps the last decision.
