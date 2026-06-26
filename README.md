@@ -176,10 +176,12 @@ instantaneous rule above). Let `difference_trend = inside_trend − outside_tren
   waiting for full equilibrium. The outside-warming requirement is what keeps it
   a *morning* behaviour: it won't close just because the room is cooling quickly
   under good ventilation in the evening.
-- **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
-  (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
-  **do not** close — keep ventilating into the cool-down. If outside is actually
-  warmer (`difference ≤ 0`), it always closes regardless of trend.
+- **Evening hold.** If `difference ≤ close threshold` while outside is still
+  cooler (`difference > 0`) **and more cooling is still available** — either the
+  gap is widening (`difference_trend ≥ +rate`) *or* outside is itself still
+  cooling (`outside_trend ≤ −rate`) — **do not** close; keep ventilating into the
+  cool-down. If outside is actually warmer (`difference ≤ 0`), it always closes
+  regardless of trend.
 
 **With a recommendation helper linked (latch).** Open fires only when the helper
 is off (not already open) and close only when it is on (currently open), so a
@@ -230,11 +232,11 @@ the two. This deliberately captures the cases you described:
   temperature ticked up.
 - **Don't make the room hotter than it was.** Closing before full equilibrium
   means you stop pulling in air that is no longer meaningfully cooler.
-- **Evening cool-down — keep ventilating.** The mirror image: when the gap is
-  near equilibrium but *widening* because outside is dropping faster than the
-  room (a typical evening), the blueprint **suppresses** the equilibrium close so
-  you keep capturing the cooling. If outside is actually *warmer* (difference ≤
-  0) it always closes, regardless of trend.
+- **Evening cool-down — keep ventilating.** When the gap is near equilibrium but
+  more cooling is still available — the gap is *widening* (outside dropping faster
+  than the room) **or** outside is itself still *cooling* — the blueprint
+  **suppresses** the equilibrium close so you keep capturing the cool-down. It
+  closes once outside levels off near equilibrium (or becomes warmer).
 - **Evening, room cooling fast under ventilation.** The gap shrinks because the
   *room* is dropping toward outside (ventilation working) while outside is flat or
   falling — not because outside is warming. The windows stay open; an early close

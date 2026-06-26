@@ -483,13 +483,15 @@ triggers:
          and (outside_rate >= converge_rate)
          and (diff > close_diff)
          and (diff < open_diff) %}
-      {# Evening: the gap is widening in our favour (outside dropping faster than
-         the room) while outside is still cooler. Keep ventilating - suppress the
-         equilibrium close so an evening cool-down isn't cut short. #}
-      {% set widening = (has_in or has_out)
-         and ((inside_rate - outside_rate) >= converge_rate)
-         and (diff > 0) %}
-      {% set base_close = (diff <= close_diff) and not widening %}
+      {# Evening hold: while outside is still cooler (diff > 0), keep ventilating
+         if more cooling is still available - either because the gap is widening
+         (room warming and/or outside dropping faster: difference_trend >= rate)
+         OR because outside itself is still actively cooling (outside_rate <=
+         -rate). Both mean closing now would cut an evening cool-down short. #}
+      {% set hold_open = (has_in or has_out) and (diff > 0)
+         and (((inside_rate - outside_rate) >= converge_rate)
+              or (outside_rate <= (-1.0 * converge_rate))) %}
+      {% set base_close = (diff <= close_diff) and not hold_open %}
       {# Latch: when a helper is linked, only close if currently open. #}
       {% set has_latch = rec_helper not in ('', none) %}
       {% set may_close = (not has_latch) or is_state(rec_helper, 'on') %}

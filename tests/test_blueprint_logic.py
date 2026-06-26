@@ -501,9 +501,14 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # Gap closing but slower than the minimum convergence rate (0.1/h).
         self.assertFalse(self.close("22.8", "22.0", "0.0", "0.05"))
 
-    def test_equilibrium_still_closes_without_trend_help(self):
-        # Base close still works regardless of trend direction.
-        self.assertTrue(self.close("22.4", "22.0", "-5.0", "-5.0"))
+    def test_equilibrium_closes_when_outside_steady(self):
+        # Base equilibrium close fires when outside is steady (no hold-open).
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "0.0"))
+
+    def test_equilibrium_holds_when_outside_still_dropping(self):
+        # Both dropping fast (outside still actively cooling) -> keep ventilating,
+        # the room can keep tracking the falling outdoor temperature down.
+        self.assertFalse(self.close("22.4", "22.0", "-5.0", "-5.0"))
 
     def test_early_close_not_triggered_above_open_band(self):
         # diff 1.5 is in the open band: never an early close there.
@@ -827,6 +832,91 @@ class RecommendationLatchTests(unittest.TestCase):
     def test_oscillation_fires_once_with_latch(self):
         opens, _ = self._simulate(self.OSCILLATION, helper_linked=True)
         self.assertEqual(opens, 1)  # latched: a single notification
+
+
+class ComprehensiveScenarioMatrixTests(unittest.TestCase):
+    """Exhaustive truth table: every difference band crossed with every trend
+    regime, plus boundaries and the no-trend cases. Each row asserts the expected
+    open and close outcome with the thresholds min=22, open=1.0, close=0.5,
+    rate=0.1. Trend rates are degrees/hour."""
+
+    TREND_CTX = TrendEarlyCloseTests.CONTEXT
+    PLAIN_CTX = TriggerTemplateTests.CONTEXT
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.templates = {t["id"]: t["value_template"] for t in doc["triggers"]}
+
+    def _pair(self, ctx, inside, outside, in_rate=None, out_rate=None):
+        kw = dict(inside_state=inside, outside_state=outside, context=ctx)
+        if in_rate is not None:
+            kw.update(inside_trend_state=in_rate, outside_trend_state=out_rate)
+        o = render(self.templates["open"], **kw)
+        c = render(self.templates["close"], **kw)
+        return o, c
+
+    # (label, inside, outside, in_rate, out_rate, expect_open, expect_close)
+    WITH_TREND = [
+        # Open band (diff >= 1.0): always open, never close, trend irrelevant.
+        ("open/outside-warming", "25", "23.5", "0", "1.0", True, False),
+        ("open/outside-cooling", "25", "23.5", "0", "-1.0", True, False),
+        ("open/room-cooling-fast", "25", "23.5", "-2.0", "-1.0", True, False),
+        # Dead band (0.5 < diff < 1.0): early close ONLY if outside warming.
+        ("dead/morning-early-close", "25", "24.2", "0", "1.0", False, True),
+        ("dead/evening-room-cooling-fast", "25", "24.2", "-2.0", "-1.0", False, False),
+        ("dead/evening-outside-dropping", "25", "24.2", "0", "-1.0", False, False),
+        ("dead/outside-flat-room-cooling", "25", "24.2", "-1.0", "0", False, False),
+        ("dead/warming-below-rate", "25", "24.2", "0", "0.05", False, False),
+        ("dead/room-warming-outside-flat", "25", "24.2", "1.0", "0", False, False),
+        ("dead/boundary-early-close", "25", "24.2", "0", "0.1", False, True),
+        # Close band (0 < diff <= 0.5): base close UNLESS hold-open.
+        ("close/equilibrium-steady", "25", "24.6", "0", "0", False, True),
+        ("close/morning-equilibrium", "25", "24.6", "0", "1.0", False, True),
+        ("close/evening-widening", "25", "24.6", "0", "-1.0", False, False),
+        ("close/evening-room-cooling-fast", "25", "24.6", "-2.0", "-1.0", False, False),
+        ("close/room-warming-outside-flat", "25", "24.6", "0.5", "0", False, False),
+        ("close/outside-barely-moving", "25", "24.6", "0", "-0.05", False, True),
+        ("close/both-dropping-fast-holds", "25", "24.6", "-5.0", "-5.0", False, False),
+        # Outside warmer (diff <= 0): always close, never hold.
+        ("warmer/outside-cooling-fast", "22", "22.5", "0", "-2.0", False, True),
+        ("warmer/steady", "22", "22.5", "0", "0", False, True),
+        # Minimum-indoor gate and boundaries.
+        ("below-min/cool-room", "21", "18", "0", "0", False, False),
+        ("boundary/open-and-min-inclusive", "22", "21.0", "0", "0", True, False),
+        ("boundary/close-threshold-inclusive", "25", "24.5", "0", "0", False, True),
+    ]
+
+    # Without trend sensors: pure threshold behaviour.
+    NO_TREND = [
+        ("open-band", "25", "23.5", True, False),
+        ("dead-band-holds", "25", "24.2", False, False),
+        ("close-band-closes", "25", "24.6", False, True),
+        ("outside-warmer-closes", "22", "22.5", False, True),
+        ("below-min-holds", "21", "18", False, False),
+        ("open-boundary", "22", "21.0", True, False),
+        ("close-boundary", "25", "24.5", False, True),
+    ]
+
+    def test_with_trend_matrix(self):
+        for label, ins, out, ir, orr, eo, ec in self.WITH_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.TREND_CTX, ins, out, ir, orr)
+                self.assertEqual(o, eo, f"{label}: open expected {eo}, got {o}")
+                self.assertEqual(c, ec, f"{label}: close expected {ec}, got {c}")
+
+    def test_no_trend_matrix(self):
+        for label, ins, out, eo, ec in self.NO_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.PLAIN_CTX, ins, out)
+                self.assertEqual(o, eo, f"{label}: open expected {eo}, got {o}")
+                self.assertEqual(c, ec, f"{label}: close expected {ec}, got {c}")
+
+    def test_open_and_close_never_both_true(self):
+        # Open and close must be mutually exclusive in every trend scenario.
+        for label, ins, out, ir, orr, _eo, _ec in self.WITH_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.TREND_CTX, ins, out, ir, orr)
+                self.assertFalse(o and c, f"{label}: open and close both fired")
 
 
 if __name__ == "__main__":

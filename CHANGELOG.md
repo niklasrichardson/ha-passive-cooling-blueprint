@@ -8,15 +8,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **Evening early-close false positive.** The trend-based early close fired
-  whenever the indoor/outdoor gap was "converging"
-  (`inside_trend − outside_trend ≤ −rate`). In the evening the gap also shrinks
-  when the *room* cools faster than outside under good ventilation, which the old
-  test mistook for a morning convergence and produced a spurious "close" (e.g. a
-  room at a `0.7°` dead-band difference). Early close now additionally requires
-  outside to be **genuinely warming** (`outside_trend ≥ +rate`), so it only fires
-  in the morning case and keeps ventilating in the evening. Added regression
-  tests for the evening room-cooling-fast case.
+- **Evening trend false positives (early close and equilibrium close).** The
+  trend refinements keyed off the *relative* `difference_trend`, which also moves
+  in the evening when the room cools faster than outside under good ventilation —
+  producing spurious "close" recommendations. Both are now keyed off the
+  **absolute outside trend**:
+  - **Early close** (dead-band) now requires outside to be genuinely warming
+    (`outside_trend ≥ +rate`), so it only fires in the morning case (fixes a
+    spurious close on a room at a `0.7°` dead-band difference).
+  - **Evening hold** (close-band) now keeps ventilating when outside is still
+    cooler *and* more cooling is available — the gap widening **or** outside still
+    cooling (`outside_trend ≤ −rate`) — instead of only when the gap was widening.
+    So a room cooling toward a still-dropping outside keeps its windows open.
+
+### Added
+
+- **Exhaustive scenario-matrix tests** covering every `difference` band crossed
+  with every trend regime (warming / cooling / flat × converging / widening /
+  neutral), boundaries, the minimum-indoor gate, and the no-trend cases, plus an
+  open/close mutual-exclusion check.
 
 ## [0.5.0] - 2026-06-25
 
