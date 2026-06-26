@@ -13,10 +13,10 @@
 # latch state (on = open). Link it in the test automation's "Recommendation
 # output", and flip it off to reset the latch between runs.
 
-title: Passive Cooling Test
+title: Tests
 views:
-  - title: Test
-    path: test
+  - title: Passive Cooling Tests
+    path: passive-cooling-tests
     type: sections
     max_columns: 2
     sections:
