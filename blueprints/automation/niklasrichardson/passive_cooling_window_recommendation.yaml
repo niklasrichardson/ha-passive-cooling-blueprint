@@ -59,14 +59,16 @@ blueprint:
           description: >-
             A friendly name for the room, exposed to your actions as the
             `room_name` variable. Leave blank to use the selected area's name
-            automatically; set it to override that name.
+            automatically; set it to override that name. Example: Master Bedroom.
           default: ""
           selector:
             text: {}
         inside_temperature_sensor:
           name: Indoor temperature sensor
           description: >-
-            The sensor measuring the temperature inside the room.
+            The sensor measuring the temperature inside the room. Suggested
+            naming: sensor.<room>_temperature, e.g.
+            sensor.master_bedroom_temperature.
           selector:
             entity:
               filter:
@@ -76,7 +78,9 @@ blueprint:
           name: Outdoor temperature sensor
           description: >-
             The sensor measuring the outdoor temperature. Use the same unit
-            (°C or °F) as the indoor sensor.
+            (°C or °F) as the indoor sensor. Suggested naming:
+            sensor.average_outside_temperature (one shared outdoor sensor can
+            serve every room).
           selector:
             entity:
               filter:
@@ -151,8 +155,10 @@ blueprint:
           description: >-
             A sensor reporting the rate of change of the indoor temperature, in
             degrees per hour (for example a Derivative helper with unit_time set
-            to hours). Used only for the early-close behaviour. Leave blank to
-            disable trend awareness.
+            to hours). Used only for the trend-based close behaviour. Leave blank
+            to disable trend awareness. Suggested naming:
+            sensor.<room>_temperature_trend, e.g.
+            sensor.master_bedroom_temperature_trend.
           default: ""
           selector:
             entity:
@@ -163,7 +169,8 @@ blueprint:
           description: >-
             A sensor reporting the rate of change of the outdoor temperature, in
             degrees per hour. Leave blank to disable trend awareness. Provide
-            both trend sensors for the most accurate result.
+            both trend sensors for the most accurate result. Suggested naming:
+            sensor.average_outside_temperature_trend.
           default: ""
           selector:
             entity:
@@ -251,7 +258,9 @@ blueprint:
             the recommendation only changes on the open/close edges, the helper
             holds the current standing recommendation (on = open, off = close).
             Leave blank to disable. This is set in addition to — not instead of
-            — your open/close actions.
+            — your open/close actions. Suggested naming, one per room:
+            input_boolean.passive_cooling_<room>, e.g.
+            input_boolean.passive_cooling_master_bedroom.
           default: ""
           selector:
             entity:
@@ -270,7 +279,7 @@ blueprint:
             the per-automation number, so you can change one helper instead
             of editing every automation. Leave blank to use the number on the
             form. Changes to the helper take effect on the next trigger
-            evaluation.
+            evaluation. Suggested helper: input_number.passive_cooling_min_indoor_temp.
           default: ""
           selector:
             entity:
@@ -283,7 +292,8 @@ blueprint:
           description: >-
             Optional shared source for the open-window temperature difference.
             Overrides the per-automation number when set and valid. Leave blank
-            to use the number on the form.
+            to use the number on the form. Suggested helper:
+            input_number.passive_cooling_open_difference.
           default: ""
           selector:
             entity:
@@ -296,7 +306,8 @@ blueprint:
           description: >-
             Optional shared source for the close-window temperature difference.
             Overrides the per-automation number when set and valid. Leave blank
-            to use the number on the form.
+            to use the number on the form. Suggested helper:
+            input_number.passive_cooling_close_difference.
           default: ""
           selector:
             entity:
@@ -311,6 +322,7 @@ blueprint:
             MINUTES (an input_number set to 5 means 5 minutes). Overrides the
             per-automation duration when set and valid. Leave blank to use the
             duration on the form. An invalid helper falls back to that duration.
+            Suggested helper: input_number.passive_cooling_stability_minutes.
           default: ""
           selector:
             entity:
@@ -328,7 +340,8 @@ blueprint:
           description: >-
             Optional shared source for the minimum convergence rate (degrees per
             hour). Overrides the per-automation number when set and valid. Leave
-            blank to use the number on the form.
+            blank to use the number on the form. Suggested helper:
+            input_number.passive_cooling_convergence_rate.
           default: ""
           selector:
             entity:

@@ -20,6 +20,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tile and per-room recommendation + temperature tiles.
 - Tests asserting the helper is an optional `input_boolean` input and that the
   open/close branches set it on/off.
+- **Naming-convention examples** in the input descriptions (suggested entity ids
+  for the sensors, trend sensors, global helpers and the recommendation helper)
+  and a consolidated **"How the recommendation is decided"** section in the
+  README covering the open/close logic with and without trend sensors.
 
 - **Evening cool-down (trend-aware close suppression).** When trend sensors are
   configured and the indoor/outdoor gap is near equilibrium but *widening*

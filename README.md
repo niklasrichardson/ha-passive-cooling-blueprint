@@ -25,6 +25,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
+- [How the recommendation is decided](#how-the-recommendation-is-decided)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
 - [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
@@ -125,6 +126,39 @@ A recommendation must hold steady for this long before its action runs (default
 `5 minutes`). This is implemented with Home Assistant's template-trigger `for:`
 option and smooths out brief sensor spikes — a single stray reading will not
 trigger a notification.
+
+## How the recommendation is decided
+
+Let `difference = inside − outside` (positive means outside is cooler).
+
+**Without trend sensors (temperature only):**
+
+```
+OPEN   when  inside ≥ minimum indoor temperature
+         AND difference ≥ open threshold
+CLOSE  when  difference ≤ close threshold
+HOLD   otherwise — the hysteresis dead-band (close < difference < open),
+             where the current recommendation simply persists
+```
+
+**With trend sensors** (these refine the **close** only; opening is always the
+instantaneous rule above). Let `difference_trend = inside_trend − outside_trend`
+— negative means the gap is *closing*, positive means it is *widening*:
+
+- **Early close (morning).** If `difference` is in the dead-band *and* the gap is
+  closing faster than the convergence rate (`difference_trend ≤ −rate`), close
+  early instead of waiting for full equilibrium.
+- **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
+  (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
+  **do not** close — keep ventilating into the cool-down. If outside is actually
+  warmer (`difference ≤ 0`), it always closes regardless of trend.
+
+**With a recommendation helper linked (latch).** Open fires only when the helper
+is off (not already open) and close only when it is on (currently open), so a
+`difference` that merely oscillates across a threshold can't re-send the same
+recommendation.
+
+Each section below explains these in more depth.
 
 ## Trend awareness: early close (optional)
 
