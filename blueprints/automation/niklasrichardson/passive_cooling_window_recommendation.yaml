@@ -261,12 +261,12 @@ blueprint:
           selector:
             action: {}
     output_section:
-      name: Recommendation output (optional)
+      name: Status output (optional)
       icon: mdi:export
       collapsed: true
       input:
         recommendation_helper:
-          name: Recommendation helper (optional)
+          name: Status helper (optional)
           description: >-
             Optional input_boolean that reflects this room's current
             recommendation, for dashboards. The automation turns it ON when

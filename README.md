@@ -28,7 +28,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
-- [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
+- [Status output for dashboards (optional)](#status-output-for-dashboards-optional)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -321,15 +321,15 @@ global blank and use the number field. An invalid or unavailable helper safely
 falls back to the per-automation number, so a broken helper never stops the
 automation.
 
-## Recommendation output for dashboards (optional)
+## Status output for dashboards (optional)
 
 The blueprint runs your open/close *actions*, but doesn't itself create an
 entity you can put on a dashboard. To get a per-room status you can show, link
-an optional **recommendation helper**: an `input_boolean` the automation turns
+an optional **status helper**: an `input_boolean` the automation turns
 **on** when opening is recommended and **off** when closing is recommended (in
 addition to your normal actions).
 
-- Create one `input_boolean` per room and link it under *Recommendation output*.
+- Create one `input_boolean` per room and link it under *Status output*.
 - For a polished, fully-native board, mirror each `input_boolean` with a template
   `binary_sensor` (`device_class: window`): tiles show **Open/Closed**, a window
   icon, state-based colour, and the room temperature (carried as an attribute) —

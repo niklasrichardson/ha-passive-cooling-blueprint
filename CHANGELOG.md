@@ -22,6 +22,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Renamed the optional **Recommendation output** section to **Status output**
+  (and its field to **Status helper**) — display labels only; the input id
+  `recommendation_helper` is unchanged, so existing automations keep their link.
 - **Default minimum indoor temperature lowered from `22.0` to `19.0`.**
 - The minimum indoor temperature changed from a one-sided open gate to a
   two-sided comfort floor (see Added): opening now requires `inside ≥ floor +
