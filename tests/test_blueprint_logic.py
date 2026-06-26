@@ -266,7 +266,7 @@ class TriggerTemplateTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
         "reopen_band": 1.0,
     }
 
@@ -467,7 +467,7 @@ class TrendEarlyCloseTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
         "reopen_band": 1.0,
     }
 
@@ -590,7 +590,7 @@ class GlobalOverrideTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
         "reopen_band": 1.0,
     }
 
@@ -757,7 +757,7 @@ class StabilityDurationForTests(unittest.TestCase):
             )
 
 
-class RecommendationLatchTests(unittest.TestCase):
+class StatusLatchTests(unittest.TestCase):
     """When a recommendation helper is linked it latches the recommendation:
     open fires only while the helper is off, close only while it is on, so a
     difference that merely oscillates across a threshold cannot re-fire."""
@@ -776,7 +776,7 @@ class RecommendationLatchTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
         "reopen_band": 1.0,
     }
 
@@ -787,7 +787,7 @@ class RecommendationLatchTests(unittest.TestCase):
         }
 
     def _render(self, which, inside, outside, *, helper_linked, helper_state):
-        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        ctx = dict(self.BASE, status_helper=self.HELPER if helper_linked else "")
         return render(
             self.templates[which],
             inside_state=inside,
@@ -823,7 +823,7 @@ class RecommendationLatchTests(unittest.TestCase):
         helper = "off"
         opens = closes = 0
         prev_open = prev_close = False
-        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        ctx = dict(self.BASE, status_helper=self.HELPER if helper_linked else "")
         for inside_state, outside_state in sequence:
             extra = {self.HELPER: helper}
             o = render(self.templates["open"], inside_state=inside_state,

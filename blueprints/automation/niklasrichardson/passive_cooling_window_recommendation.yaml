@@ -417,7 +417,7 @@ trigger_variables:
   converge_rate_global: !input minimum_convergence_rate_global
   stability_dur: !input stability_duration
   stability_global: !input stability_duration_global
-  rec_helper: !input status_helper
+  status_helper: !input status_helper
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
@@ -454,8 +454,8 @@ triggers:
          if (open_diff_global and is_number(states(open_diff_global)))
          else (open_diff_input | float) %}
       {# Latch: when a helper is linked, only open if not already open. #}
-      {% set has_latch = rec_helper not in ('', none) %}
-      {% set may_open = (not has_latch) or (not is_state(rec_helper, 'on')) %}
+      {% set has_latch = status_helper not in ('', none) %}
+      {% set may_open = (not has_latch) or (not is_state(status_helper, 'on')) %}
       {# Comfort band: re-open only once the room has risen the re-open band above
          the comfort floor (min_indoor), so it does not flap right at the floor
          where the comfort-floor close fires. #}
@@ -521,8 +521,8 @@ triggers:
          over-cools below comfort. This is what bounds the evening hold. #}
       {% set floor_close = (inside | float(0)) <= min_indoor %}
       {# Latch: when a helper is linked, only close if currently open. #}
-      {% set has_latch = rec_helper not in ('', none) %}
-      {% set may_close = (not has_latch) or is_state(rec_helper, 'on') %}
+      {% set has_latch = status_helper not in ('', none) %}
+      {% set may_close = (not has_latch) or is_state(status_helper, 'on') %}
       {{ valid and (base_close or early_close or floor_close) and may_close }}
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
