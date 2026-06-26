@@ -34,7 +34,7 @@ https://niklasrichardson.github.io/ha-passive-cooling-blueprint/docs/generator/
    - *Global setting helpers* and *Per-room helpers* → `configuration.yaml` (or a
      package), then restart.
    - *Overview dashboard* → a new dashboard's raw configuration editor.
-   - *Automation stubs* → a starting point; link each `recommendation_helper` in
+   - *Automation stubs* → a starting point; link each `status_helper` in
      the editor and replace `notify.notify` with your service.
 
 The generated entity ids follow the project's

@@ -19,9 +19,13 @@ inside_trend − outside_trend  ≤  −(minimum convergence rate)
 ```
 
 i.e. the outdoor temperature is catching up to indoors **faster** than the room
-itself is warming. When that is true **and** the difference is sitting inside the
-hysteresis band (between the close and open thresholds), the blueprint recommends
-closing early. This deliberately captures these cases:
+itself is warming. For the early close the blueprint also requires that **outside
+is genuinely warming** (`outside_trend ≥ +rate`) — this is what confines the early
+close to the *morning* case and stops it firing in the evening, when a
+well-ventilated room can cool faster than the (still-dropping) outside and shrink
+the gap without outside warming at all. When both hold **and** the difference is
+sitting inside the hysteresis band (between the close and open thresholds), the
+blueprint recommends closing early. This deliberately captures these cases:
 
 - **Morning, outside cold but rising, room still warm.** The gap is huge, so even
   though outside is rising you keep ventilating — exactly what you want. Only once
@@ -32,11 +36,14 @@ closing early. This deliberately captures these cases:
   temperature ticked up.
 - **Don't make the room hotter than it was.** Closing before full equilibrium
   means you stop pulling in air that is no longer meaningfully cooler.
-- **Evening cool-down — keep ventilating.** The mirror image: when the gap is near
-  equilibrium but *widening* because outside is dropping faster than the room (a
-  typical evening), the blueprint **suppresses** the equilibrium close so you keep
-  capturing the cooling. If outside is actually *warmer* (difference ≤ 0) it
-  always closes, regardless of trend.
+- **Evening cool-down — keep ventilating.** The mirror image: when the difference
+  is near equilibrium while outside is still cooler (difference > 0) **and** more
+  cooling is still available — the gap is *widening* **or** outside is still
+  actively dropping (`outside_trend ≤ −rate`) — the blueprint **suppresses** the
+  equilibrium close so you keep capturing the cooling. Keying this on the absolute
+  outside trend (not just the relative gap) is what keeps a room cooling toward a
+  still-dropping outside ventilating. If outside is actually *warmer*
+  (difference ≤ 0) it always closes, regardless of trend.
 
 The open recommendation is **unchanged** by trends — opening still happens on the
 instantaneous threshold. Trends refine only the *close* decision (closing early

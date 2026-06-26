@@ -4,7 +4,7 @@
 - [When it recommends opening](#when-it-recommends-opening-windows)
 - [When it recommends closing](#when-it-recommends-closing-windows)
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
-- [Minimum indoor temperature](#minimum-indoor-temperature)
+- [Minimum indoor temperature (comfort floor)](#minimum-indoor-temperature-comfort-floor)
 - [Stability duration](#stability-duration)
 - [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [How state is tracked](#how-state-is-tracked)
@@ -28,20 +28,25 @@ One automation handles one room. Add a separate automation per room.
 All of the following must hold, continuously, for the
 [stability duration](#stability-duration):
 
-1. The room is **at or above** the minimum indoor temperature (default `22.0°`).
-   No point cooling a room that is already cool.
+1. The room has warmed a **re-open band above** the minimum indoor temperature
+   (comfort floor), i.e. `inside ≥ floor + re-open band` (defaults: floor `19.0°`,
+   band `1.0°`). No point cooling a room that is already at or near the floor.
 2. The outdoor sensor is **at least the open threshold cooler** than indoors
    (default `1.0°`), i.e. `inside − outside ≥ open threshold`.
 3. Both sensors report valid numbers.
 
 ## When it recommends closing windows
 
-The close recommendation fires when, continuously for the stability duration:
+The close recommendation fires when, continuously for the stability duration,
+**either**:
 
 1. The indoor/outdoor difference has fallen to **the close threshold or less**
    (default `0.5°`), i.e. `inside − outside ≤ close threshold`. The outside air
-   is no longer meaningfully cooler.
-2. Both sensors report valid numbers.
+   is no longer meaningfully cooler; **or**
+2. The room has cooled to **the comfort floor or below** (`inside ≤ floor`,
+   default `19.0°`) — you have the cool you wanted, so stop.
+
+…and both sensors report valid numbers.
 
 (With trend sensors, the close decision is refined — see
 [Trend awareness](trends.md) and the algorithm below.)
@@ -75,17 +80,28 @@ and you lose the anti-flapping protection (the blueprint will still run safely �
 it simply behaves like a single-threshold automation). The bundled tests and the
 input descriptions both call this out.
 
-## Minimum indoor temperature
+## Minimum indoor temperature (comfort floor)
 
-Cooler outside air is not a reason to open windows if the room is already
-comfortable or cold. The minimum indoor temperature gates the open
-recommendation:
+The minimum indoor temperature (default `19.0°`) is a **two-sided comfort floor**,
+not just an open gate:
+
+- **Closing.** Once the room cools to the floor (`inside ≤ floor`), the blueprint
+  recommends closing — you have captured the cool you wanted, so there is no point
+  ventilating the room below it. This bounds the evening cool-down.
+- **Opening.** It only recommends opening again once the room has warmed a
+  **re-open band** above the floor (`inside ≥ floor + band`, default band `1.0°`).
 
 ```
-Inside: 19.0°C   Outside: 16.0°C   ->  Do NOT recommend opening (room is cool)
+Floor 19.0°  •  re-open band 1.0°
+
+Inside: 18.5°C   Outside: 15.0°C   ->  Close: at/below the comfort floor
+Inside: 19.5°C   Outside: 15.0°C   ->  Hold: warmed, but not past floor + band
+Inside: 20.0°C   Outside: 15.0°C   ->  Open: warmed a full band above the floor
 ```
 
-The minimum applies to the **open** recommendation only.
+The **re-open band is hysteresis**, exactly like the open/close thresholds: it
+keeps the room from flapping open↔close right at the floor. Widen the band for
+fewer cycles on a cold night; narrow it to hug the floor more tightly.
 
 ## Stability duration
 
@@ -109,9 +125,10 @@ built from a handful of well-established control and building-science ideas:
   thermostat avoids chattering around a single setpoint. Opening needs a clear
   gap; closing needs the gap to nearly vanish; in between, nothing changes.
   (→ open vs close thresholds.)
-- **A comfort gate.** The minimum indoor temperature is a lower comfort bound —
-  there is no point cooling a room that is already cool. (→ minimum indoor
-  temperature.)
+- **A comfort floor.** The minimum indoor temperature is a *two-sided* lower
+  bound — close once the room reaches it, and only re-open a re-open band above it
+  (itself hysteresis). There is no point cooling a room past the floor. (→
+  minimum indoor temperature.)
 - **Debouncing — a low-pass filter.** The stability duration makes a
   recommendation prove itself before acting, so a single stray reading does not
   fire an action. (→ stability duration.)
@@ -122,31 +139,38 @@ built from a handful of well-established control and building-science ideas:
   [trend awareness](trends.md).)
 - **A latch — a small state machine.** An optional helper stores the standing
   recommendation, so each edge-triggered recommendation fires once per real
-  change rather than re-firing on noise. (→ [recommendation output](dashboards.md).)
+  change rather than re-firing on noise. (→ [status output](dashboards.md).)
 
 Concretely, with `difference = inside − outside` (positive means outside cooler):
 
 ```
-OPEN   when  inside ≥ minimum indoor temperature
+OPEN   when  inside ≥ comfort floor + re-open band
          AND difference ≥ open threshold
 CLOSE  when  difference ≤ close threshold
-HOLD   otherwise — the hysteresis dead-band (close < difference < open),
-             where the current recommendation simply persists
+          OR inside ≤ comfort floor
+HOLD   otherwise — the hysteresis dead-band (close < difference < open) with the
+             room above the floor, where the current recommendation persists
 ```
 
 **With trend sensors** (these refine the **close** only; opening is always the
-instantaneous rule above). Let `difference_trend = inside_trend − outside_trend`
-— negative means the gap is *closing*, positive means it is *widening*:
+instantaneous rule above). Both refinements key off the **absolute outside
+trend** — not the *relative* `difference_trend`, which also moves in the evening
+when a well-ventilated room cools faster than outside and would otherwise produce
+spurious closes:
 
-- **Early close (morning).** If `difference` is in the dead-band *and* the gap is
-  closing faster than the convergence rate (`difference_trend ≤ −rate`), close
-  early instead of waiting for full equilibrium.
-- **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
-  (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
-  **do not** close — keep ventilating into the cool-down. If outside is actually
-  warmer (`difference ≤ 0`), it always closes regardless of trend.
+- **Early close (morning).** If `difference` is in the dead-band, the gap is
+  closing faster than the convergence rate (`difference_trend ≤ −rate`), **and**
+  outside is genuinely warming (`outside_trend ≥ +rate`), close early instead of
+  waiting for full equilibrium. The outside-warming requirement is what confines
+  this to the morning case.
+- **Evening hold.** If `difference ≤ close threshold` while outside is still
+  cooler (`difference > 0`) **and** more cooling is available — the gap widening
+  (`difference_trend ≥ +rate`) **or** outside still cooling
+  (`outside_trend ≤ −rate`) — **do not** close; keep ventilating into the
+  cool-down. If outside is actually warmer (`difference ≤ 0`), it always closes
+  regardless of trend.
 
-**With a recommendation helper linked (latch).** Open fires only when the helper
+**With a status helper linked (latch).** Open fires only when the helper
 is off (not already open) and close only when it is on (currently open), so a
 `difference` that merely oscillates across a threshold can't re-send the same
 recommendation.
@@ -197,5 +221,5 @@ reliable for the core flow, at the price of two documented edge cases:
    [additional condition](configuration.md#configuring-actions).
 
 For a stricter, persistent state machine you can link an optional
-[recommendation helper](dashboards.md), which latches the recommendation (open
+[status helper](dashboards.md), which latches the recommendation (open
 only when off, close only when on) and survives restarts.

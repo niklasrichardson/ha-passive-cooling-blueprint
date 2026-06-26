@@ -150,7 +150,7 @@ function genGlobals() {
     step: 0.1
     unit_of_measurement: "°"
     mode: box
-    initial: 22
+    initial: 19
   passive_cooling_open_difference:
     name: Passive Cooling – Open-window difference
     icon: mdi:window-open-variant
@@ -258,7 +258,7 @@ function genAutomations(rooms) {
       room_name: ${r.name}
       inside_temperature_sensor: ${r.indoor}
       outside_temperature_sensor: ${r.outdoor}${trendBlock}
-      recommendation_helper: input_boolean.${PREFIX}${s}
+      status_helper: input_boolean.${PREFIX}${s}
       open_action:
         - action: notify.notify   # replace with your service
           data:
@@ -321,7 +321,7 @@ document.getElementById("generate").addEventListener("click", () => {
   }
   if (document.getElementById("optAutomations").checked) {
     out.appendChild(block("Automation stubs",
-      "A starting point per room. Link each recommendation_helper in the editor, and replace notify.notify with your service.",
+      "A starting point per room. Link each status_helper in the editor, and replace notify.notify with your service.",
       genAutomations(rooms)));
   }
 });

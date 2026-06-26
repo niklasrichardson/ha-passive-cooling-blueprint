@@ -12,7 +12,7 @@
 - **Too many notifications / flapping.** Increase the gap between the open and
   close thresholds (bigger dead band) and/or increase the stability duration. For
   a room sitting right at a threshold, link a
-  [recommendation helper](dashboards.md#it-also-stops-repeat-notifications) to
+  [status helper](dashboards.md#it-also-stops-repeat-notifications) to
   latch the recommendation and stop repeats outright.
 - **A "close" arrived in the evening while it was getting cooler.** The base rule
   closes at near-equilibrium. With [trend sensors](trends.md) the evening

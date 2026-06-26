@@ -26,12 +26,12 @@ outside is cooler, and a "close" when they converge.
 
 ## 3. (Optional) Tune it
 
-- Defaults: minimum indoor `22°`, open difference `1.0°`, close difference
-  `0.5°`, stability `5 min`. Enter values in the **same unit as your sensors** —
-  see [Configuration](configuration.md) and
+- Defaults: minimum indoor (comfort floor) `19°`, re-open band `1.0°`, open
+  difference `1.0°`, close difference `0.5°`, stability `5 min`. Enter values in
+  the **same unit as your sensors** — see [Configuration](configuration.md) and
   [Celsius & Fahrenheit](configuration.md#celsius-and-fahrenheit).
 - Repeat "open" alerts on a marginal room? See
-  [Troubleshooting](troubleshooting.md), or link a recommendation helper to
+  [Troubleshooting](troubleshooting.md), or link a status helper to
   [latch](dashboards.md#it-also-stops-repeat-notifications) it.
 
 ## Add another room

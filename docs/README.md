@@ -25,7 +25,7 @@ Start with the Quick start; reach for the rest as you need it.
   (morning) and evening hold, and how to set up the derivative sensors.
 - **[Global overrides](global-overrides.md)** — tune a whole fleet of rooms from
   shared helpers.
-- **[Dashboards](dashboards.md)** — the optional recommendation output, native
+- **[Dashboards](dashboards.md)** — the optional status output, native
   Open/Closed tiles, and the latch that stops repeat notifications.
 - **[Setup generator](generator.md)** — a browser tool that turns a list of your
   rooms into ready-to-paste helpers, dashboard and automation YAML (no Python).
