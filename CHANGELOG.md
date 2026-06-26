@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Documentation restructured into a `docs/` set.** The README is now a lean
+  landing page (intro, features, quick links); the detailed content moved into
+  focused pages under `docs/` (quick start, installation, how it works,
+  configuration, trend awareness, global overrides, dashboards, testing,
+  troubleshooting) with an index at `docs/README.md`. No content was removed.
+
+### Added
+
+- **Quick start** guide (`docs/quickstart.md`) with an add-a-room checklist.
+
 ## [0.6.0] - 2026-06-26
 
 ### Added
