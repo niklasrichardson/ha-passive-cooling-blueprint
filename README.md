@@ -25,7 +25,7 @@ notification, a TTS announcement, a light, a script, anything.
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
-- [How the recommendation is decided](#how-the-recommendation-is-decided)
+- [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
 - [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
@@ -127,11 +127,36 @@ A recommendation must hold steady for this long before its action runs (default
 option and smooths out brief sensor spikes — a single stray reading will not
 trigger a notification.
 
-## How the recommendation is decided
+## The algorithm (and the science behind it)
 
-Let `difference = inside − outside` (positive means outside is cooler).
+At heart this is a small **controls layer for night-ventilation cooling** (also
+called *night flushing*): ventilate while outdoor air can carry heat out of the
+room, and stop before it stops helping. It is deliberately simple, but it is
+built from a handful of well-established control and building-science ideas:
 
-**Without trend sensors (temperature only):**
+- **Differential (ΔT) control — "free cooling".** Decisions are driven by the
+  *difference* between indoor and outdoor temperature, the same idea as an
+  air-side **economizer** that draws in outdoor air whenever it is cooler than
+  inside. (→ the open rule.)
+- **Hysteresis — a dead-band.** Two thresholds, not one — exactly how a
+  thermostat avoids chattering around a single setpoint. Opening needs a clear
+  gap; closing needs the gap to nearly vanish; in between, nothing changes.
+  (→ open vs close thresholds.)
+- **A comfort gate.** The minimum indoor temperature is a lower comfort bound —
+  there is no point cooling a room that is already cool. (→ minimum indoor
+  temperature.)
+- **Debouncing — a low-pass filter.** The stability duration makes a
+  recommendation prove itself before acting, so a single stray reading does not
+  fire an action. (→ stability duration.)
+- **A derivative term — a step toward predictive control.** Optional trend
+  sensors add the *rate of change*. It does not forecast; it asks "which way is
+  the gap heading right now?" — closing early when the gap is collapsing
+  (morning) and holding open when it is widening (evening). (→ trend awareness.)
+- **A latch — a small state machine.** An optional helper stores the standing
+  recommendation, so each edge-triggered recommendation fires once per real
+  change rather than re-firing on noise. (→ recommendation output.)
+
+Concretely, with `difference = inside − outside` (positive means outside cooler):
 
 ```
 OPEN   when  inside ≥ minimum indoor temperature
@@ -158,7 +183,9 @@ is off (not already open) and close only when it is on (currently open), so a
 `difference` that merely oscillates across a threshold can't re-send the same
 recommendation.
 
-Each section below explains these in more depth.
+What it deliberately **does not** model: thermal mass, weather forecasts, airflow
+rate (a cracked window ≠ cross-ventilation), or humidity — see
+[Limitations](#limitations). Each mechanism above has its own section below.
 
 ## Trend awareness: early close (optional)
 

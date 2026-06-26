@@ -22,8 +22,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   open/close branches set it on/off.
 - **Naming-convention examples** in the input descriptions (suggested entity ids
   for the sensors, trend sensors, global helpers and the recommendation helper)
-  and a consolidated **"How the recommendation is decided"** section in the
-  README covering the open/close logic with and without trend sensors.
+  and a **"The algorithm (and the science behind it)"** README section that
+  frames the open/close logic in terms of the control and building-science ideas
+  it draws on (differential/"free cooling" control, hysteresis dead-band, a
+  comfort gate, debouncing, a derivative/predictive term, and a latch) and gives
+  the rules with and without trend sensors.
 
 - **Evening cool-down (trend-aware close suppression).** When trend sensors are
   configured and the indoor/outdoor gap is near equilibrium but *widening*
