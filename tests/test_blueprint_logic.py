@@ -532,6 +532,20 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # Gap widening slower than the convergence rate (0.1/h) -> still closes.
         self.assertTrue(self.close("22.4", "22.0", "0.0", "-0.05"))
 
+    def test_evening_room_cooling_fast_does_not_early_close(self):
+        # Evening: diff 0.7 (dead band), but the gap is shrinking only because the
+        # ROOM is cooling faster than outside (good ventilation) while outside is
+        # DROPPING. The difference trend is negative (-1.0), which the old logic
+        # mistook for a morning convergence. It must NOT early close.
+        self.assertFalse(self.close("28.3", "27.6", "-2.0", "-1.0"))
+
+    def test_early_close_requires_outside_warming(self):
+        # Same converging difference trend, but outside is flat (not warming):
+        # the room is simply cooling toward a steady outside -> keep ventilating.
+        self.assertFalse(self.close("22.8", "22.0", "-1.0", "0.0"))
+        # Outside genuinely rising at/above the rate -> early close as intended.
+        self.assertTrue(self.close("22.8", "22.0", "0.0", "0.1"))
+
 
 class GlobalOverrideTests(unittest.TestCase):
     """A configured, valid global helper overrides the per-automation number;

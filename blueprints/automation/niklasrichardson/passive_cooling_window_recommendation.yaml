@@ -474,7 +474,13 @@ triggers:
       {# The gap closes when outside catches up faster than the room warms. #}
       {% set converging = (has_in or has_out)
          and ((inside_rate - outside_rate) <= (-1.0 * converge_rate)) %}
+      {# Early close fires only when the gap is closing BECAUSE outside is warming
+         toward the room (the morning case). It must NOT fire when the gap shrinks
+         only because the room is cooling faster than outside under good
+         ventilation (a typical evening) - so require outside to be genuinely
+         rising, not merely the difference trend to be negative. #}
       {% set early_close = converging
+         and (outside_rate >= converge_rate)
          and (diff > close_diff)
          and (diff < open_diff) %}
       {# Evening: the gap is widening in our favour (outside dropping faster than

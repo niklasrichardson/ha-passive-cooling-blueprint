@@ -170,9 +170,12 @@ HOLD   otherwise — the hysteresis dead-band (close < difference < open),
 instantaneous rule above). Let `difference_trend = inside_trend − outside_trend`
 — negative means the gap is *closing*, positive means it is *widening*:
 
-- **Early close (morning).** If `difference` is in the dead-band *and* the gap is
-  closing faster than the convergence rate (`difference_trend ≤ −rate`), close
-  early instead of waiting for full equilibrium.
+- **Early close (morning).** If `difference` is in the dead-band, the gap is
+  closing faster than the convergence rate (`difference_trend ≤ −rate`), *and*
+  outside is genuinely warming (`outside_trend ≥ +rate`), close early instead of
+  waiting for full equilibrium. The outside-warming requirement is what keeps it
+  a *morning* behaviour: it won't close just because the room is cooling quickly
+  under good ventilation in the evening.
 - **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
   (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
   **do not** close — keep ventilating into the cool-down. If outside is actually
@@ -202,16 +205,20 @@ room heats up again.
 
 ### The rule, in plain terms
 
-Let `difference = inside − outside`. The gap is **closing** when
+Let `difference = inside − outside`. The blueprint closes **early** when all of:
 
 ```
-inside_trend − outside_trend  ≤  −(minimum convergence rate)
+inside_trend − outside_trend  ≤  −(minimum convergence rate)   # the gap is closing
+outside_trend                 ≥  +(minimum convergence rate)   # because outside is WARMING
+close threshold  <  difference  <  open threshold              # and it's in the dead-band
 ```
 
-i.e. the outdoor temperature is catching up to indoors **faster** than the room
-itself is warming. When that is true **and** the difference is sitting inside the
-hysteresis band (between the close and open thresholds), the blueprint
-recommends closing early. This deliberately captures the cases you described:
+The first line says the gap is closing; the second says it is closing **because
+the outdoor temperature is rising toward the room** — the morning case. That
+second requirement matters: in the evening the gap can also shrink because the
+*room* is cooling quickly under good ventilation, and there you want to keep the
+windows open, not close. Requiring outside to be genuinely warming distinguishes
+the two. This deliberately captures the cases you described:
 
 - **Morning, outside cold but rising, room still warm.** The gap is huge, so
   even though outside is rising you keep ventilating — exactly what you want.
@@ -228,6 +235,10 @@ recommends closing early. This deliberately captures the cases you described:
   room (a typical evening), the blueprint **suppresses** the equilibrium close so
   you keep capturing the cooling. If outside is actually *warmer* (difference ≤
   0) it always closes, regardless of trend.
+- **Evening, room cooling fast under ventilation.** The gap shrinks because the
+  *room* is dropping toward outside (ventilation working) while outside is flat or
+  falling — not because outside is warming. The windows stay open; an early close
+  only fires when outside is genuinely rising.
 
 The open recommendation is **unchanged** by trends — opening still happens on the
 instantaneous threshold. Trends refine only the *close* decision (closing early

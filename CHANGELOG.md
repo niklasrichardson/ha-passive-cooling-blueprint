@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-06-26
+
+### Fixed
+
+- **Evening early-close false positive.** The trend-based early close fired
+  whenever the indoor/outdoor gap was "converging"
+  (`inside_trend − outside_trend ≤ −rate`). In the evening the gap also shrinks
+  when the *room* cools faster than outside under good ventilation, which the old
+  test mistook for a morning convergence and produced a spurious "close" (e.g. a
+  room at a `0.7°` dead-band difference). Early close now additionally requires
+  outside to be **genuinely warming** (`outside_trend ≥ +rate`), so it only fires
+  in the morning case and keeps ventilating in the evening. Added regression
+  tests for the evening room-cooling-fast case.
+
 ## [0.5.0] - 2026-06-25
 
 ### Added
