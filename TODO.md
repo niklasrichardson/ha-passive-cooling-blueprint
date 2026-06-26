@@ -8,7 +8,7 @@ scoped to the temperature-only passive-cooling use case.
 - [x] Optional Area input with automatic room naming (`area_name`). (0.3.0)
 - [x] Copy-paste action examples in the editor; testing rig under `examples/`. (0.3.0)
 - [x] Global overrides for shared settings across many automations. (0.4.0)
-- [x] Optional recommendation output (`input_boolean`) + native tile dashboard. (0.5.0)
+- [x] Optional status output (`input_boolean`) + native tile dashboard. (0.5.0)
 - [x] Recommendation latch: gate open/close on the helper to stop repeat
       notifications from threshold oscillation. (0.5.0)
 - [x] Evening cool-down: trend-aware suppression of the equilibrium close when

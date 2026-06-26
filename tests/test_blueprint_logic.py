@@ -144,6 +144,7 @@ class BlueprintStructureTests(unittest.TestCase):
             "inside_temperature_sensor",
             "outside_temperature_sensor",
             "minimum_indoor_temperature",
+            "comfort_reopen_band",
             "open_temperature_difference",
             "close_temperature_difference",
             "stability_duration",
@@ -155,7 +156,7 @@ class BlueprintStructureTests(unittest.TestCase):
             "close_temperature_difference_global",
             "minimum_convergence_rate_global",
             "stability_duration_global",
-            "recommendation_helper",
+            "status_helper",
             "open_action",
             "close_action",
             "open_additional_conditions",
@@ -196,16 +197,16 @@ class BlueprintStructureTests(unittest.TestCase):
             self.assertIn("default", inputs[key], key)
             self.assertEqual(inputs[key]["default"], "", key)
 
-    def test_recommendation_helper_is_optional_input_boolean(self):
+    def test_status_helper_is_optional_input_boolean(self):
         inputs = {}
         for section in self.blueprint["input"].values():
             inputs.update(section["input"])
-        helper = inputs["recommendation_helper"]
+        helper = inputs["status_helper"]
         self.assertEqual(helper["default"], "")
         filt = helper["selector"]["entity"]["filter"][0]
         self.assertEqual(filt["domain"], "input_boolean")
 
-    def test_actions_set_recommendation_helper(self):
+    def test_actions_set_status_helper(self):
         # The open branch turns the helper on; the close branch turns it off.
         actions = self.doc["actions"]
         branches = actions[0]["choose"]
@@ -265,7 +266,8 @@ class TriggerTemplateTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -297,8 +299,10 @@ class TriggerTemplateTests(unittest.TestCase):
         self.assertFalse(self.close_true("25.0", "22.0"))
 
     def test_scenario_2_below_minimum(self):
+        # Below the comfort floor (22 here): never open, and close — the room is
+        # already at/below comfort, so stop ventilating.
         self.assertFalse(self.open_true("20.0", "17.0"))
-        self.assertFalse(self.close_true("20.0", "17.0"))
+        self.assertTrue(self.close_true("20.0", "17.0"))
 
     def test_scenario_3_hysteresis_band_remains_open(self):
         # diff 0.8 sits between close (0.5) and open (1.0): neither edge fires.
@@ -331,9 +335,20 @@ class TriggerTemplateTests(unittest.TestCase):
         # Exactly at the close threshold counts as close (<=).
         self.assertTrue(self.close_true("22.5", "22.0"))
 
-    def test_minimum_boundary_inclusive(self):
-        # Inside exactly at the minimum still qualifies to open.
-        self.assertTrue(self.open_true("22.0", "20.0"))
+    def test_open_requires_comfort_floor_plus_band(self):
+        # Opening requires the room to reach the comfort floor + re-open band
+        # (22 + 1 = 23 here): at exactly that it opens; just below it does not.
+        self.assertTrue(self.open_true("23.0", "20.0"))
+        self.assertFalse(self.open_true("22.9", "20.0"))
+
+    def test_comfort_floor_close(self):
+        # The room at/below the comfort floor closes regardless of outside.
+        self.assertTrue(self.close_true("22.0", "10.0"))   # at the floor
+        self.assertTrue(self.close_true("21.5", "10.0"))   # below the floor
+        # Just above the floor (still within the band), a big gap does not open
+        # and the floor close does not fire: hold.
+        self.assertFalse(self.open_true("22.5", "10.0"))
+        self.assertFalse(self.close_true("22.5", "21.0"))
 
     def test_fahrenheit_scaled_thresholds(self):
         # Same logic, Fahrenheit values and a Fahrenheit-scaled threshold.
@@ -452,7 +467,8 @@ class TrendEarlyCloseTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -501,9 +517,14 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # Gap closing but slower than the minimum convergence rate (0.1/h).
         self.assertFalse(self.close("22.8", "22.0", "0.0", "0.05"))
 
-    def test_equilibrium_still_closes_without_trend_help(self):
-        # Base close still works regardless of trend direction.
-        self.assertTrue(self.close("22.4", "22.0", "-5.0", "-5.0"))
+    def test_equilibrium_closes_when_outside_steady(self):
+        # Base equilibrium close fires when outside is steady (no hold-open).
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "0.0"))
+
+    def test_equilibrium_holds_when_outside_still_dropping(self):
+        # Both dropping fast (outside still actively cooling) -> keep ventilating,
+        # the room can keep tracking the falling outdoor temperature down.
+        self.assertFalse(self.close("22.4", "22.0", "-5.0", "-5.0"))
 
     def test_early_close_not_triggered_above_open_band(self):
         # diff 1.5 is in the open band: never an early close there.
@@ -532,6 +553,25 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # Gap widening slower than the convergence rate (0.1/h) -> still closes.
         self.assertTrue(self.close("22.4", "22.0", "0.0", "-0.05"))
 
+    def test_evening_room_cooling_fast_does_not_early_close(self):
+        # Evening: diff 0.7 (dead band), but the gap is shrinking only because the
+        # ROOM is cooling faster than outside (good ventilation) while outside is
+        # DROPPING. The difference trend is negative (-1.0), which the old logic
+        # mistook for a morning convergence. It must NOT early close.
+        self.assertFalse(self.close("28.3", "27.6", "-2.0", "-1.0"))
+
+    def test_early_close_requires_outside_warming(self):
+        # Same converging difference trend, but outside is flat (not warming):
+        # the room is simply cooling toward a steady outside -> keep ventilating.
+        self.assertFalse(self.close("22.8", "22.0", "-1.0", "0.0"))
+        # Outside genuinely rising at/above the rate -> early close as intended.
+        self.assertTrue(self.close("22.8", "22.0", "0.0", "0.1"))
+
+    def test_comfort_floor_bounds_evening_hold(self):
+        # Evening, outside still cooling (would normally hold open), but the room
+        # has reached the comfort floor (22) -> close to avoid over-cooling.
+        self.assertTrue(self.close("22.0", "20.0", "-1.0", "-1.0"))
+
 
 class GlobalOverrideTests(unittest.TestCase):
     """A configured, valid global helper overrides the per-automation number;
@@ -550,7 +590,8 @@ class GlobalOverrideTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -716,8 +757,8 @@ class StabilityDurationForTests(unittest.TestCase):
             )
 
 
-class RecommendationLatchTests(unittest.TestCase):
-    """When a recommendation helper is linked it latches the recommendation:
+class StatusLatchTests(unittest.TestCase):
+    """When a status helper is linked it latches the recommendation:
     open fires only while the helper is off, close only while it is on, so a
     difference that merely oscillates across a threshold cannot re-fire."""
 
@@ -735,7 +776,8 @@ class RecommendationLatchTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
-        "rec_helper": "",
+        "status_helper": "",
+        "reopen_band": 1.0,
     }
 
     def setUp(self):
@@ -745,7 +787,7 @@ class RecommendationLatchTests(unittest.TestCase):
         }
 
     def _render(self, which, inside, outside, *, helper_linked, helper_state):
-        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        ctx = dict(self.BASE, status_helper=self.HELPER if helper_linked else "")
         return render(
             self.templates[which],
             inside_state=inside,
@@ -781,7 +823,7 @@ class RecommendationLatchTests(unittest.TestCase):
         helper = "off"
         opens = closes = 0
         prev_open = prev_close = False
-        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        ctx = dict(self.BASE, status_helper=self.HELPER if helper_linked else "")
         for inside_state, outside_state in sequence:
             extra = {self.HELPER: helper}
             o = render(self.templates["open"], inside_state=inside_state,
@@ -813,6 +855,96 @@ class RecommendationLatchTests(unittest.TestCase):
     def test_oscillation_fires_once_with_latch(self):
         opens, _ = self._simulate(self.OSCILLATION, helper_linked=True)
         self.assertEqual(opens, 1)  # latched: a single notification
+
+
+class ComprehensiveScenarioMatrixTests(unittest.TestCase):
+    """Exhaustive truth table: every difference band crossed with every trend
+    regime, plus boundaries and the no-trend cases. Each row asserts the expected
+    open and close outcome with the thresholds min=22, open=1.0, close=0.5,
+    rate=0.1. Trend rates are degrees/hour."""
+
+    TREND_CTX = TrendEarlyCloseTests.CONTEXT
+    PLAIN_CTX = TriggerTemplateTests.CONTEXT
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.templates = {t["id"]: t["value_template"] for t in doc["triggers"]}
+
+    def _pair(self, ctx, inside, outside, in_rate=None, out_rate=None):
+        kw = dict(inside_state=inside, outside_state=outside, context=ctx)
+        if in_rate is not None:
+            kw.update(inside_trend_state=in_rate, outside_trend_state=out_rate)
+        o = render(self.templates["open"], **kw)
+        c = render(self.templates["close"], **kw)
+        return o, c
+
+    # (label, inside, outside, in_rate, out_rate, expect_open, expect_close)
+    WITH_TREND = [
+        # Open band (diff >= 1.0): always open, never close, trend irrelevant.
+        ("open/outside-warming", "25", "23.5", "0", "1.0", True, False),
+        ("open/outside-cooling", "25", "23.5", "0", "-1.0", True, False),
+        ("open/room-cooling-fast", "25", "23.5", "-2.0", "-1.0", True, False),
+        # Dead band (0.5 < diff < 1.0): early close ONLY if outside warming.
+        ("dead/morning-early-close", "25", "24.2", "0", "1.0", False, True),
+        ("dead/evening-room-cooling-fast", "25", "24.2", "-2.0", "-1.0", False, False),
+        ("dead/evening-outside-dropping", "25", "24.2", "0", "-1.0", False, False),
+        ("dead/outside-flat-room-cooling", "25", "24.2", "-1.0", "0", False, False),
+        ("dead/warming-below-rate", "25", "24.2", "0", "0.05", False, False),
+        ("dead/room-warming-outside-flat", "25", "24.2", "1.0", "0", False, False),
+        ("dead/boundary-early-close", "25", "24.2", "0", "0.1", False, True),
+        # Close band (0 < diff <= 0.5): base close UNLESS hold-open.
+        ("close/equilibrium-steady", "25", "24.6", "0", "0", False, True),
+        ("close/morning-equilibrium", "25", "24.6", "0", "1.0", False, True),
+        ("close/evening-widening", "25", "24.6", "0", "-1.0", False, False),
+        ("close/evening-room-cooling-fast", "25", "24.6", "-2.0", "-1.0", False, False),
+        ("close/room-warming-outside-flat", "25", "24.6", "0.5", "0", False, False),
+        ("close/outside-barely-moving", "25", "24.6", "0", "-0.05", False, True),
+        ("close/both-dropping-fast-holds", "25", "24.6", "-5.0", "-5.0", False, False),
+        # Outside warmer (diff <= 0): always close, never hold.
+        ("warmer/outside-cooling-fast", "22", "22.5", "0", "-2.0", False, True),
+        ("warmer/steady", "22", "22.5", "0", "0", False, True),
+        # Minimum-indoor gate and boundaries.
+        # Comfort floor (min 22, re-open band 1.0 -> open gate 23).
+        ("floor/below-floor-closes", "21", "18", "0", "0", False, True),
+        ("floor/at-floor-closes", "22", "10", "0", "0", False, True),
+        ("floor/in-band-holds", "22.5", "10", "0", "0", False, False),
+        ("floor/at-floor-plus-band-opens", "23", "22.0", "0", "0", True, False),
+        ("boundary/close-threshold-inclusive", "25", "24.5", "0", "0", False, True),
+    ]
+
+    # Without trend sensors: pure threshold behaviour.
+    NO_TREND = [
+        ("open-band", "25", "23.5", True, False),
+        ("dead-band-holds", "25", "24.2", False, False),
+        ("close-band-closes", "25", "24.6", False, True),
+        ("outside-warmer-closes", "22", "22.5", False, True),
+        ("below-floor-closes", "21", "18", False, True),
+        ("at-floor-closes", "22", "10", False, True),
+        ("in-band-holds", "22.5", "10", False, False),
+        ("open-boundary-at-floor-plus-band", "23", "22.0", True, False),
+        ("close-boundary", "25", "24.5", False, True),
+    ]
+
+    def test_with_trend_matrix(self):
+        for label, ins, out, ir, orr, eo, ec in self.WITH_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.TREND_CTX, ins, out, ir, orr)
+                self.assertEqual(o, eo, f"{label}: open expected {eo}, got {o}")
+                self.assertEqual(c, ec, f"{label}: close expected {ec}, got {c}")
+
+    def test_no_trend_matrix(self):
+        for label, ins, out, eo, ec in self.NO_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.PLAIN_CTX, ins, out)
+                self.assertEqual(o, eo, f"{label}: open expected {eo}, got {o}")
+                self.assertEqual(c, ec, f"{label}: close expected {ec}, got {c}")
+
+    def test_open_and_close_never_both_true(self):
+        # Open and close must be mutually exclusive in every trend scenario.
+        for label, ins, out, ir, orr, _eo, _ec in self.WITH_TREND:
+            with self.subTest(label):
+                o, c = self._pair(self.TREND_CTX, ins, out, ir, orr)
+                self.assertFalse(o and c, f"{label}: open and close both fired")
 
 
 if __name__ == "__main__":

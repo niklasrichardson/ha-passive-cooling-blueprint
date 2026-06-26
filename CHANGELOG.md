@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-26
+
+### Added
+
+- **Comfort floor.** The minimum indoor temperature is now a *two-sided* comfort
+  floor: the blueprint recommends **closing** once the room cools to it
+  (`inside ≤ floor`) and only recommends **opening** once the room has warmed a
+  new **re-open band** above it (`inside ≥ floor + band`, default band `1.0°`, via
+  the new `comfort_reopen_band` input). The band is hysteresis so it doesn't flap
+  at the floor. This bounds the evening hold — the room is kept around the floor
+  instead of cooling indefinitely.
+- **Exhaustive scenario-matrix tests** covering every `difference` band crossed
+  with every trend regime (warming / cooling / flat × converging / widening /
+  neutral), the comfort floor and re-open band, boundaries, and the no-trend
+  cases, plus an open/close mutual-exclusion check.
+
+### Changed
+
+- Renamed the optional **Recommendation output** section to **Status output**,
+  its field to **Status helper**, and the input id `recommendation_helper` to
+  `status_helper`. **Breaking:** automations that linked the old helper must
+  re-link it (re-select the helper) after updating. The example file
+  `examples/recommendation_helpers.yaml` is renamed to `examples/status_helpers.yaml`.
+- **Default minimum indoor temperature lowered from `22.0` to `19.0`.**
+- The minimum indoor temperature changed from a one-sided open gate to a
+  two-sided comfort floor (see Added): opening now requires `inside ≥ floor +
+  re-open band`, and a new close fires at `inside ≤ floor`.
+
+### Fixed
+
+- **Evening trend false positives (early close and equilibrium close).** The
+  trend refinements keyed off the *relative* `difference_trend`, which also moves
+  in the evening when the room cools faster than outside under good ventilation —
+  producing spurious "close" recommendations. Both are now keyed off the
+  **absolute outside trend**:
+  - **Early close** (dead-band) now requires outside to be genuinely warming
+    (`outside_trend ≥ +rate`), so it only fires in the morning case (fixes a
+    spurious close on a room at a `0.7°` dead-band difference).
+  - **Evening hold** (close-band) now keeps ventilating when outside is still
+    cooler *and* more cooling is available — the gap widening **or** outside still
+    cooling (`outside_trend ≤ −rate`) — instead of only when the gap was widening.
+    So a room cooling toward a still-dropping outside keeps its windows open.
+
 ## [0.5.0] - 2026-06-25
 
 ### Added
@@ -13,7 +56,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recommended and **off** when closing is recommended, in addition to your
   open/close actions. Leave it blank to disable. Enables a per-room status board
   with native tile cards.
-- `examples/recommendation_helpers.yaml` (per-room `input_boolean` plus a
+- `examples/status_helpers.yaml` (per-room `input_boolean` plus a
   template `binary_sensor` with `device_class: window` for native Open/Closed
   tiles with an icon, state colour, and the room temperature as an attribute)
   and a tile-based `examples/overview_dashboard.yaml` with an outside-temperature

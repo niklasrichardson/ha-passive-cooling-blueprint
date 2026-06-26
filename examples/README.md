@@ -113,13 +113,13 @@ every automation:
 A linked helper overrides that automation's local number; leave a global blank
 to keep using the local value.
 
-## Per-room recommendation tiles
+## Per-room status tiles
 
-The blueprint's optional **Recommendation helper** output keeps a per-room
+The blueprint's optional **Status output** keeps a per-room
 `input_boolean` in sync (on = open recommended, off = close), so you can build a
 status board with native tile cards — no custom cards required.
 
-[`recommendation_helpers.yaml`](./recommendation_helpers.yaml) sets up two things
+[`status_helpers.yaml`](./status_helpers.yaml) sets up two things
 per room:
 
 1. an **`input_boolean`** the automation writes to (on = open recommended), and
@@ -130,9 +130,9 @@ per room:
 
 Then:
 
-1. Paste `recommendation_helpers.yaml` into your config and restart (adjust the
+1. Paste `status_helpers.yaml` into your config and restart (adjust the
    temperature sensor entity ids to your rooms).
-2. In each automation, link its `input_boolean` under *Recommendation output
+2. In each automation, link its `input_boolean` under *Status output
    (optional)*.
 3. Add [`overview_dashboard.yaml`](./overview_dashboard.yaml): a prominent
    outside-temperature tile, then one tile per room showing the recommendation

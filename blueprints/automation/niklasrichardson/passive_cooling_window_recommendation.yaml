@@ -91,16 +91,33 @@ blueprint:
       collapsed: false
       input:
         minimum_indoor_temperature:
-          name: Minimum indoor temperature
+          name: Minimum indoor temperature (comfort floor)
           description: >-
-            Only recommend opening windows when the room is at least this warm.
-            Prevents passive-cooling recommendations during cold weather. Enter
-            this value in the same unit your sensors report (°C or °F).
-          default: 22.0
+            The comfort floor, in your sensors' unit (°C or °F). The blueprint
+            keeps the room around this temperature: it recommends CLOSING once the
+            room cools to this floor (so it never over-cools below comfort), and
+            only recommends OPENING once the room has warmed the re-open band
+            (below) above it.
+          default: 19.0
           selector:
             number:
               min: 0.0
               max: 45.0
+              step: 0.1
+              unit_of_measurement: "°"
+              mode: box
+        comfort_reopen_band:
+          name: Re-open band above the comfort floor
+          description: >-
+            How far above the comfort floor the room must rise before opening is
+            recommended again. This hysteresis stops the recommendation flapping
+            right at the floor: it closes at the floor and re-opens only once the
+            room has warmed this much above it. Keep it above 0.
+          default: 1.0
+          selector:
+            number:
+              min: 0.0
+              max: 10.0
               step: 0.1
               unit_of_measurement: "°"
               mode: box
@@ -244,12 +261,12 @@ blueprint:
           selector:
             action: {}
     output_section:
-      name: Recommendation output (optional)
+      name: Status output (optional)
       icon: mdi:export
       collapsed: true
       input:
-        recommendation_helper:
-          name: Recommendation helper (optional)
+        status_helper:
+          name: Status helper (optional)
           description: >-
             Optional input_boolean that reflects this room's current
             recommendation, for dashboards. The automation turns it ON when
@@ -391,6 +408,7 @@ trigger_variables:
   # value: the global helper when set and valid, otherwise the local number.
   min_indoor_input: !input minimum_indoor_temperature
   min_indoor_global: !input minimum_indoor_temperature_global
+  reopen_band: !input comfort_reopen_band
   open_diff_input: !input open_temperature_difference
   open_diff_global: !input open_temperature_difference_global
   close_diff_input: !input close_temperature_difference
@@ -399,7 +417,7 @@ trigger_variables:
   converge_rate_global: !input minimum_convergence_rate_global
   stability_dur: !input stability_duration
   stability_global: !input stability_duration_global
-  rec_helper: !input recommendation_helper
+  status_helper: !input status_helper
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
@@ -411,7 +429,7 @@ trigger_variables:
 # The open and close bands are separated by the hysteresis gap (close_diff <
 # difference < open_diff), where neither template is true.
 #
-# Latch (when a recommendation helper is linked): the helper holds the current
+# Latch (when a status helper is linked): the helper holds the current
 # standing recommendation (on = open). The open trigger is additionally gated on
 # the helper being OFF and the close trigger on it being ON, so a difference that
 # merely oscillates across a threshold (without crossing into the OTHER band)
@@ -436,10 +454,13 @@ triggers:
          if (open_diff_global and is_number(states(open_diff_global)))
          else (open_diff_input | float) %}
       {# Latch: when a helper is linked, only open if not already open. #}
-      {% set has_latch = rec_helper not in ('', none) %}
-      {% set may_open = (not has_latch) or (not is_state(rec_helper, 'on')) %}
+      {% set has_latch = status_helper not in ('', none) %}
+      {% set may_open = (not has_latch) or (not is_state(status_helper, 'on')) %}
+      {# Comfort band: re-open only once the room has risen the re-open band above
+         the comfort floor (min_indoor), so it does not flap right at the floor
+         where the comfort-floor close fires. #}
       {{ is_number(inside) and is_number(outside)
-         and (inside | float) >= min_indoor
+         and (inside | float) >= (min_indoor + (reopen_band | float))
          and ((inside | float) - (outside | float)) >= open_diff
          and may_open }}
     for: >-
@@ -457,6 +478,9 @@ triggers:
       {% set valid = is_number(inside) and is_number(outside) %}
       {% set diff = (inside | float(0)) - (outside | float(0)) %}
       {# Effective thresholds: global helper when set and valid, else local. #}
+      {% set min_indoor = (states(min_indoor_global) | float)
+         if (min_indoor_global and is_number(states(min_indoor_global)))
+         else (min_indoor_input | float) %}
       {% set open_diff = (states(open_diff_global) | float)
          if (open_diff_global and is_number(states(open_diff_global)))
          else (open_diff_input | float) %}
@@ -474,20 +498,32 @@ triggers:
       {# The gap closes when outside catches up faster than the room warms. #}
       {% set converging = (has_in or has_out)
          and ((inside_rate - outside_rate) <= (-1.0 * converge_rate)) %}
+      {# Early close fires only when the gap is closing BECAUSE outside is warming
+         toward the room (the morning case). It must NOT fire when the gap shrinks
+         only because the room is cooling faster than outside under good
+         ventilation (a typical evening) - so require outside to be genuinely
+         rising, not merely the difference trend to be negative. #}
       {% set early_close = converging
+         and (outside_rate >= converge_rate)
          and (diff > close_diff)
          and (diff < open_diff) %}
-      {# Evening: the gap is widening in our favour (outside dropping faster than
-         the room) while outside is still cooler. Keep ventilating - suppress the
-         equilibrium close so an evening cool-down isn't cut short. #}
-      {% set widening = (has_in or has_out)
-         and ((inside_rate - outside_rate) >= converge_rate)
-         and (diff > 0) %}
-      {% set base_close = (diff <= close_diff) and not widening %}
+      {# Evening hold: while outside is still cooler (diff > 0), keep ventilating
+         if more cooling is still available - either because the gap is widening
+         (room warming and/or outside dropping faster: difference_trend >= rate)
+         OR because outside itself is still actively cooling (outside_rate <=
+         -rate). Both mean closing now would cut an evening cool-down short. #}
+      {% set hold_open = (has_in or has_out) and (diff > 0)
+         and (((inside_rate - outside_rate) >= converge_rate)
+              or (outside_rate <= (-1.0 * converge_rate))) %}
+      {% set base_close = (diff <= close_diff) and not hold_open %}
+      {# Comfort floor: stop ventilating once the room has cooled to the comfort
+         floor (min_indoor), regardless of outside or trend, so it never
+         over-cools below comfort. This is what bounds the evening hold. #}
+      {% set floor_close = (inside | float(0)) <= min_indoor %}
       {# Latch: when a helper is linked, only close if currently open. #}
-      {% set has_latch = rec_helper not in ('', none) %}
-      {% set may_close = (not has_latch) or is_state(rec_helper, 'on') %}
-      {{ valid and (base_close or early_close) and may_close }}
+      {% set has_latch = status_helper not in ('', none) %}
+      {% set may_close = (not has_latch) or is_state(status_helper, 'on') %}
+      {{ valid and (base_close or early_close or floor_close) and may_close }}
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))
@@ -512,6 +548,7 @@ variables:
   outside_trend_entity: !input outside_temperature_trend
   min_indoor_input: !input minimum_indoor_temperature
   min_indoor_global: !input minimum_indoor_temperature_global
+  reopen_band: !input comfort_reopen_band
   open_diff_input: !input open_temperature_difference
   open_diff_global: !input open_temperature_difference_global
   close_diff_input: !input close_temperature_difference
@@ -541,7 +578,7 @@ variables:
     {{ ((states(inside_trend_entity) | float(0))
         - (states(outside_trend_entity) | float(0))) | round(2) }}
   recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
-  recommendation_helper: !input recommendation_helper
+  status_helper: !input status_helper
 
 # Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid
 # numbers right now. The triggers already require this, but a sensor can drop to
@@ -568,13 +605,13 @@ actions:
           # when one is configured. choose/default runs the user action list.
           - if:
               - condition: template
-                value_template: "{{ recommendation_helper not in ('', none) }}"
+                value_template: "{{ status_helper not in ('', none) }}"
             then:
               - action: input_boolean.turn_on
                 target:
                   entity_id: >-
-                    {{ [recommendation_helper]
-                       if recommendation_helper not in ('', none) else [] }}
+                    {{ [status_helper]
+                       if status_helper not in ('', none) else [] }}
           - choose: []
             default: !input open_action
       - conditions:
@@ -585,12 +622,12 @@ actions:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ recommendation_helper not in ('', none) }}"
+                value_template: "{{ status_helper not in ('', none) }}"
             then:
               - action: input_boolean.turn_off
                 target:
                   entity_id: >-
-                    {{ [recommendation_helper]
-                       if recommendation_helper not in ('', none) else [] }}
+                    {{ [status_helper]
+                       if status_helper not in ('', none) else [] }}
           - choose: []
             default: !input close_action

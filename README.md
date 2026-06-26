@@ -23,12 +23,12 @@ notification, a TTS announcement, a light, a script, anything.
 - [When it recommends opening](#when-it-recommends-opening-windows)
 - [When it recommends closing](#when-it-recommends-closing-windows)
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
-- [Minimum indoor temperature](#minimum-indoor-temperature)
+- [Minimum indoor temperature (comfort floor)](#minimum-indoor-temperature-comfort-floor)
 - [Stability duration](#stability-duration)
 - [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
-- [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
+- [Status output for dashboards (optional)](#status-output-for-dashboards-optional)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -64,20 +64,26 @@ One automation handles one room. Add a separate automation per room.
 All of the following must hold, continuously, for the [stability
 duration](#stability-duration):
 
-1. The room is **at or above** the minimum indoor temperature (default
-   `22.0°`). No point cooling a room that is already cool.
+1. The room is **at least the re-open band above the comfort floor** (default
+   floor `19.0°` + band `1.0°`, i.e. `≥ 20.0°`). See
+   [comfort floor](#minimum-indoor-temperature-comfort-floor).
 2. The outdoor sensor is **at least the open threshold cooler** than indoors
    (default `1.0°`), i.e. `inside − outside ≥ open threshold`.
 3. Both sensors report valid numbers.
 
 ## When it recommends closing windows
 
-The close recommendation fires when, continuously for the stability duration:
+The close recommendation fires when, continuously for the stability duration,
+**either**:
 
 1. The indoor/outdoor difference has fallen to **the close threshold or less**
    (default `0.5°`), i.e. `inside − outside ≤ close threshold`. The outside air
-   is no longer meaningfully cooler.
-2. Both sensors report valid numbers.
+   is no longer meaningfully cooler; **or**
+2. The room has cooled to **the comfort floor or below** (`inside ≤ minimum
+   indoor temperature`). You've cooled enough — stop ventilating before
+   over-cooling. See [comfort floor](#minimum-indoor-temperature-comfort-floor).
+
+…and both sensors report valid numbers.
 
 ## Hysteresis: why two thresholds
 
@@ -108,17 +114,27 @@ disappears and you lose the anti-flapping protection (the blueprint will still
 run safely — it simply behaves like a single-threshold automation). The bundled
 tests and the input descriptions both call this out.
 
-## Minimum indoor temperature
+## Minimum indoor temperature (comfort floor)
 
-Cooler outside air is not a reason to open windows if the room is already
-comfortable or cold. The minimum indoor temperature gates the open
-recommendation:
+The minimum indoor temperature is a **two-sided comfort floor** — the blueprint
+keeps the room around it rather than cooling indefinitely:
+
+- It **won't open** to cool a room that is already at or near the floor — opening
+  needs the room to be at least the **re-open band** above it (default band
+  `1.0°`, so with a `19.0°` floor it opens at `≥ 20.0°`).
+- It **recommends closing** as soon as the room cools **to the floor** (`inside ≤
+  floor`), so an evening cool-down or a fast-ventilating room never over-cools
+  below comfort.
+
+The re-open band is the hysteresis that stops the recommendation flapping right
+at the floor: close at `19.0°`, and re-open only once the room drifts back up to
+`20.0°`. Enter the floor in your sensors' unit (°C or °F).
 
 ```
-Inside: 19.0°C   Outside: 16.0°C   ->  Do NOT recommend opening (room is cool)
+Inside: 19.0°C   Outside: 16.0°C   ->  Close (room is at the comfort floor)
+Inside: 19.5°C   Outside: 16.0°C   ->  Hold  (within the comfort band)
+Inside: 20.0°C   Outside: 16.0°C   ->  Open  (warm enough again, outside cooler)
 ```
-
-The minimum applies to the **open** recommendation only.
 
 ## Stability duration
 
@@ -142,9 +158,10 @@ built from a handful of well-established control and building-science ideas:
   thermostat avoids chattering around a single setpoint. Opening needs a clear
   gap; closing needs the gap to nearly vanish; in between, nothing changes.
   (→ open vs close thresholds.)
-- **A comfort gate.** The minimum indoor temperature is a lower comfort bound —
-  there is no point cooling a room that is already cool. (→ minimum indoor
-  temperature.)
+- **A comfort floor.** The minimum indoor temperature is a *two-sided* comfort
+  bound: don't open below it, and close once the room reaches it — so the room is
+  held around the floor (with a re-open band for hysteresis) rather than cooled
+  indefinitely. (→ comfort floor.)
 - **Debouncing — a low-pass filter.** The stability duration makes a
   recommendation prove itself before acting, so a single stray reading does not
   fire an action. (→ stability duration.)
@@ -154,31 +171,36 @@ built from a handful of well-established control and building-science ideas:
   (morning) and holding open when it is widening (evening). (→ trend awareness.)
 - **A latch — a small state machine.** An optional helper stores the standing
   recommendation, so each edge-triggered recommendation fires once per real
-  change rather than re-firing on noise. (→ recommendation output.)
+  change rather than re-firing on noise. (→ status output.)
 
 Concretely, with `difference = inside − outside` (positive means outside cooler):
 
 ```
-OPEN   when  inside ≥ minimum indoor temperature
+OPEN   when  inside ≥ comfort floor + re-open band
          AND difference ≥ open threshold
-CLOSE  when  difference ≤ close threshold
-HOLD   otherwise — the hysteresis dead-band (close < difference < open),
-             where the current recommendation simply persists
+CLOSE  when  difference ≤ close threshold        (outside no longer cooler)
+          OR inside ≤ comfort floor              (cooled enough — stop)
+HOLD   otherwise — the hysteresis dead-band, where the recommendation persists
 ```
 
 **With trend sensors** (these refine the **close** only; opening is always the
 instantaneous rule above). Let `difference_trend = inside_trend − outside_trend`
 — negative means the gap is *closing*, positive means it is *widening*:
 
-- **Early close (morning).** If `difference` is in the dead-band *and* the gap is
-  closing faster than the convergence rate (`difference_trend ≤ −rate`), close
-  early instead of waiting for full equilibrium.
-- **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
-  (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
-  **do not** close — keep ventilating into the cool-down. If outside is actually
-  warmer (`difference ≤ 0`), it always closes regardless of trend.
+- **Early close (morning).** If `difference` is in the dead-band, the gap is
+  closing faster than the convergence rate (`difference_trend ≤ −rate`), *and*
+  outside is genuinely warming (`outside_trend ≥ +rate`), close early instead of
+  waiting for full equilibrium. The outside-warming requirement is what keeps it
+  a *morning* behaviour: it won't close just because the room is cooling quickly
+  under good ventilation in the evening.
+- **Evening hold.** If `difference ≤ close threshold` while outside is still
+  cooler (`difference > 0`) **and more cooling is still available** — either the
+  gap is widening (`difference_trend ≥ +rate`) *or* outside is itself still
+  cooling (`outside_trend ≤ −rate`) — **do not** close; keep ventilating into the
+  cool-down. If outside is actually warmer (`difference ≤ 0`), it always closes
+  regardless of trend.
 
-**With a recommendation helper linked (latch).** Open fires only when the helper
+**With a status helper linked (latch).** Open fires only when the helper
 is off (not already open) and close only when it is on (currently open), so a
 `difference` that merely oscillates across a threshold can't re-send the same
 recommendation.
@@ -202,16 +224,20 @@ room heats up again.
 
 ### The rule, in plain terms
 
-Let `difference = inside − outside`. The gap is **closing** when
+Let `difference = inside − outside`. The blueprint closes **early** when all of:
 
 ```
-inside_trend − outside_trend  ≤  −(minimum convergence rate)
+inside_trend − outside_trend  ≤  −(minimum convergence rate)   # the gap is closing
+outside_trend                 ≥  +(minimum convergence rate)   # because outside is WARMING
+close threshold  <  difference  <  open threshold              # and it's in the dead-band
 ```
 
-i.e. the outdoor temperature is catching up to indoors **faster** than the room
-itself is warming. When that is true **and** the difference is sitting inside the
-hysteresis band (between the close and open thresholds), the blueprint
-recommends closing early. This deliberately captures the cases you described:
+The first line says the gap is closing; the second says it is closing **because
+the outdoor temperature is rising toward the room** — the morning case. That
+second requirement matters: in the evening the gap can also shrink because the
+*room* is cooling quickly under good ventilation, and there you want to keep the
+windows open, not close. Requiring outside to be genuinely warming distinguishes
+the two. This deliberately captures the cases you described:
 
 - **Morning, outside cold but rising, room still warm.** The gap is huge, so
   even though outside is rising you keep ventilating — exactly what you want.
@@ -223,11 +249,15 @@ recommends closing early. This deliberately captures the cases you described:
   temperature ticked up.
 - **Don't make the room hotter than it was.** Closing before full equilibrium
   means you stop pulling in air that is no longer meaningfully cooler.
-- **Evening cool-down — keep ventilating.** The mirror image: when the gap is
-  near equilibrium but *widening* because outside is dropping faster than the
-  room (a typical evening), the blueprint **suppresses** the equilibrium close so
-  you keep capturing the cooling. If outside is actually *warmer* (difference ≤
-  0) it always closes, regardless of trend.
+- **Evening cool-down — keep ventilating.** When the gap is near equilibrium but
+  more cooling is still available — the gap is *widening* (outside dropping faster
+  than the room) **or** outside is itself still *cooling* — the blueprint
+  **suppresses** the equilibrium close so you keep capturing the cool-down. It
+  closes once outside levels off near equilibrium (or becomes warmer).
+- **Evening, room cooling fast under ventilation.** The gap shrinks because the
+  *room* is dropping toward outside (ventilation working) while outside is flat or
+  falling — not because outside is warming. The windows stay open; an early close
+  only fires when outside is genuinely rising.
 
 The open recommendation is **unchanged** by trends — opening still happens on the
 instantaneous threshold. Trends refine only the *close* decision (closing early
@@ -291,15 +321,15 @@ global blank and use the number field. An invalid or unavailable helper safely
 falls back to the per-automation number, so a broken helper never stops the
 automation.
 
-## Recommendation output for dashboards (optional)
+## Status output for dashboards (optional)
 
 The blueprint runs your open/close *actions*, but doesn't itself create an
 entity you can put on a dashboard. To get a per-room status you can show, link
-an optional **recommendation helper**: an `input_boolean` the automation turns
+an optional **status helper**: an `input_boolean` the automation turns
 **on** when opening is recommended and **off** when closing is recommended (in
 addition to your normal actions).
 
-- Create one `input_boolean` per room and link it under *Recommendation output*.
+- Create one `input_boolean` per room and link it under *Status output*.
 - For a polished, fully-native board, mirror each `input_boolean` with a template
   `binary_sensor` (`device_class: window`): tiles show **Open/Closed**, a window
   icon, state-based colour, and the room temperature (carried as an attribute) —
@@ -494,7 +524,8 @@ use_blueprint:
     room_name: Master bedroom
     inside_temperature_sensor: sensor.master_bedroom_temperature
     outside_temperature_sensor: sensor.average_outside_temperature
-    minimum_indoor_temperature: 22
+    minimum_indoor_temperature: 19   # comfort floor
+    comfort_reopen_band: 1.0          # re-open at floor + this
     open_temperature_difference: 1
     close_temperature_difference: 0.5
     stability_duration:
@@ -538,8 +569,8 @@ unit conversion of its own**. That means it works on Fahrenheit installations,
 with two things to keep in mind:
 
 - **Enter every threshold in your sensors' unit.** On a Fahrenheit system the
-  defaults (min `22`, open `1.0`, close `0.5`) are Celsius values and make no
-  sense — use Fahrenheit equivalents, e.g. minimum `72`, open difference `2`,
+  defaults (min `19`, open `1.0`, close `0.5`) are Celsius values and make no
+  sense — use Fahrenheit equivalents, e.g. minimum `66`, open difference `2`,
   close difference `1`. The number selectors show a generic `°` so they do not
   imply Celsius.
 - **Both sensors must use the same unit.** Home Assistant converts a temperature

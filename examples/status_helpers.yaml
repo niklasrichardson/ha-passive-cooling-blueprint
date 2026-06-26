@@ -1,5 +1,5 @@
-# Per-room recommendation helpers for the Passive Cooling Window Recommendation
-# blueprint's optional "Recommendation helper" output.
+# Per-room status helpers for the Passive Cooling Window Recommendation
+# blueprint's optional "Status output" / "Status helper".
 #
 # Two parts per room:
 #   1. an input_boolean the automation writes to (on = open recommended), and
@@ -9,7 +9,7 @@
 #      current temperature as an attribute, so a single tile can show the
 #      recommendation and the temperature together.
 #
-# Link the input_boolean in each automation's "Recommendation output (optional)"
+# Link the input_boolean in each automation's "Status output (optional)"
 # section; point your dashboard tiles at the binary_sensor.
 #
 # Install: paste into configuration.yaml (or use as a package), then restart.
