@@ -38,18 +38,26 @@ views:
               {% set it = states('input_number.test_indoor_temperature_trend')|float(0) %}
               {% set ot = states('input_number.test_outdoor_temperature_trend')|float(0) %}
               {% set latch = states('input_boolean.passive_cooling_test_room') %}
+              {% set floor = 19.0 %}
+              {% set band = 1.0 %}
+              {% set rate = 0.1 %}
               {% set diff = (ind-out)|round(2) %}
               {% set dt = (it-ot)|round(2) %}
-              {% set open_now = ind >= 22 and diff >= 1.0 %}
-              {% set conv = dt <= -0.1 %}
-              {% set early = conv and diff > 0.5 and diff < 1.0 %}
-              {% set close_now = diff <= 0.5 or early %}
+              {% set open_now = ind >= (floor + band) and diff >= 1.0 %}
+              {% set conv = dt <= -1.0 * rate %}
+              {% set early = conv and ot >= rate and diff > 0.5 and diff < 1.0 %}
+              {% set hold_open = diff > 0 and (dt >= rate or ot <= -1.0 * rate) %}
+              {% set base_close = diff <= 0.5 and not hold_open %}
+              {% set floor_close = ind <= floor %}
+              {% set close_now = base_close or early or floor_close %}
               ## {{ '🪟 OPEN' if open_now else ('🌡️ CLOSE' if close_now else '⏸️ Hold') }}
 
               - Difference: **{{ diff }}°**  · open ≥1.0 · close ≤0.5 · dead-band 0.5–1.0
               - Difference trend: **{{ dt }}°/h** → {{ 'converging ✅' if conv else 'not converging' }}
-              - Min-indoor gate (≥22°): {{ 'pass' if ind >= 22 else '**BLOCKS open** ❌' }}
-              {% if close_now %}- Close path: **{{ 'EARLY (trend)' if early else 'base (equilibrium)' }}**{% endif %}
+              - Outside trend: **{{ ot }}°/h** → {{ 'warming' if ot >= rate else ('cooling' if ot <= -1.0 * rate else 'flat') }}
+              - Comfort floor {{ floor }}°, re-open ≥{{ (floor + band) }}°: {{ 'pass (warm enough to open)' if ind >= (floor + band) else '**BLOCKS open** ❌' }}{{ ' · **at/below floor → close**' if floor_close else '' }}
+              {% if close_now %}- Close path: **{{ 'FLOOR (comfort)' if floor_close and not (base_close or early) else ('EARLY (trend)' if early else 'base (equilibrium)') }}**{% endif %}
+              {% if hold_open and not floor_close %}- Evening hold: **suppressing equilibrium close** (still cooling, outside cooler){% endif %}
               - Latch (helper): **{{ latch }}** → open {{ 'allowed' if latch != 'on' else 'blocked (already open)' }}, close {{ 'allowed' if latch == 'on' else 'blocked (not open)' }}
 
       - type: grid

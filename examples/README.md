@@ -61,8 +61,9 @@ Create an automation from the blueprint and set:
 
 ## The test matrix
 
-Defaults assumed: min indoor **22°**, open **1.0°**, close **0.5°**, convergence
-rate **0.1 °/h**. `difference = indoor − outdoor`;
+Defaults assumed: comfort floor (min indoor) **19°**, re-open band **1.0°** (so a
+room re-opens only at **≥ 20°**), open **1.0°**, close **0.5°**, convergence rate
+**0.1 °/h**. `difference = indoor − outdoor`;
 `difference_trend = indoor_trend − outdoor_trend` (negative = gap closing).
 
 | # | Proves | Indoor | In-Trend | Outdoor | Out-Trend | diff / diff-trend | Expected |
@@ -70,7 +71,7 @@ rate **0.1 °/h**. `difference = indoor − outdoor`;
 | 1 | Basic OPEN | 25.0 | 0.0 | 20.0 | 0.0 | 5.0 / — | 🪟 Open |
 | 2 | Basic CLOSE (equilibrium) | 25.0 | 0.0 | 24.6 | 0.0 | 0.4 / — | 🌡️ Close |
 | 3 | Hysteresis hold (dead-band) | 25.0 | 0.0 | 24.2 | 0.0 | 0.8 / 0.0 | Nothing |
-| 4 | Min-indoor gate blocks open | 21.0 | 0.0 | 15.0 | 0.0 | 6.0 / — | Nothing |
+| 4 | Comfort-floor gate blocks open | 19.5 | 0.0 | 15.0 | 0.0 | 4.5 / — | Nothing |
 | 5 | Early CLOSE via trend | 25.0 | 0.0 | 24.3 | 2.0 | 0.7 / −2.0 | 🌡️ Close (early) |
 | 6 | Dead-band, not converging | 25.0 | 2.0 | 24.3 | 0.0 | 0.7 / +2.0 | Nothing |
 | 7 | Converging but big gap (morning) | 25.0 | 0.0 | 20.0 | 3.0 | 5.0 / −3.0 | 🪟 Open |

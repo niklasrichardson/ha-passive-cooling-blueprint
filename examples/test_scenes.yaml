@@ -38,8 +38,11 @@
     input_number.test_outdoor_temperature_trend: "0.0"
 - id: pct_4_min_gate
   name: PCT 4 Min gate
+  # Indoor 19.5 sits between the comfort floor (19) and the re-open point
+  # (floor + band = 20): outside is plenty cooler, but the room is not warm
+  # enough above the floor to re-open, so the gate blocks the open.
   entities:
-    input_number.test_indoor_temperature: "21.0"
+    input_number.test_indoor_temperature: "19.5"
     input_number.test_indoor_temperature_trend: "0.0"
     input_number.test_outdoor_temperature: "15.0"
     input_number.test_outdoor_temperature_trend: "0.0"
