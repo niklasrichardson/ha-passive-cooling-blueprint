@@ -25,7 +25,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Renamed the optional **Recommendation output** section to **Status output**,
   its field to **Status helper**, and the input id `recommendation_helper` to
   `status_helper`. **Breaking:** automations that linked the old helper must
-  re-link it (re-select the helper) after updating.
+  re-link it (re-select the helper) after updating. The example file
+  `examples/recommendation_helpers.yaml` is renamed to `examples/status_helpers.yaml`.
 - **Default minimum indoor temperature lowered from `22.0` to `19.0`.**
 - The minimum indoor temperature changed from a one-sided open gate to a
   two-sided comfort floor (see Added): opening now requires `inside ≥ floor +
@@ -55,7 +56,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recommended and **off** when closing is recommended, in addition to your
   open/close actions. Leave it blank to disable. Enables a per-room status board
   with native tile cards.
-- `examples/recommendation_helpers.yaml` (per-room `input_boolean` plus a
+- `examples/status_helpers.yaml` (per-room `input_boolean` plus a
   template `binary_sensor` with `device_class: window` for native Open/Closed
   tiles with an icon, state colour, and the room temperature as an attribute)
   and a tile-based `examples/overview_dashboard.yaml` with an outside-temperature

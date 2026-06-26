@@ -758,7 +758,7 @@ class StabilityDurationForTests(unittest.TestCase):
 
 
 class StatusLatchTests(unittest.TestCase):
-    """When a recommendation helper is linked it latches the recommendation:
+    """When a status helper is linked it latches the recommendation:
     open fires only while the helper is off, close only while it is on, so a
     difference that merely oscillates across a threshold cannot re-fire."""
 

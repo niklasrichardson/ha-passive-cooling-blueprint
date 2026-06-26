@@ -429,7 +429,7 @@ trigger_variables:
 # The open and close bands are separated by the hysteresis gap (close_diff <
 # difference < open_diff), where neither template is true.
 #
-# Latch (when a recommendation helper is linked): the helper holds the current
+# Latch (when a status helper is linked): the helper holds the current
 # standing recommendation (on = open). The open trigger is additionally gated on
 # the helper being OFF and the close trigger on it being ON, so a difference that
 # merely oscillates across a threshold (without crossing into the OTHER band)

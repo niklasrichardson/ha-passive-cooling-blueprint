@@ -171,7 +171,7 @@ built from a handful of well-established control and building-science ideas:
   (morning) and holding open when it is widening (evening). (→ trend awareness.)
 - **A latch — a small state machine.** An optional helper stores the standing
   recommendation, so each edge-triggered recommendation fires once per real
-  change rather than re-firing on noise. (→ recommendation output.)
+  change rather than re-firing on noise. (→ status output.)
 
 Concretely, with `difference = inside − outside` (positive means outside cooler):
 
@@ -200,7 +200,7 @@ instantaneous rule above). Let `difference_trend = inside_trend − outside_tren
   cool-down. If outside is actually warmer (`difference ≤ 0`), it always closes
   regardless of trend.
 
-**With a recommendation helper linked (latch).** Open fires only when the helper
+**With a status helper linked (latch).** Open fires only when the helper
 is off (not already open) and close only when it is on (currently open), so a
 `difference` that merely oscillates across a threshold can't re-send the same
 recommendation.

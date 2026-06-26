@@ -3,9 +3,9 @@
 # showing the recommendation ("Open"/"Close" with a window icon) and the room's
 # current temperature together.
 #
-# Requires the per-room helpers in recommendation_helpers.yaml (the input_boolean
-# linked in each automation's "Recommendation helper" output, plus the template
-# sensor the tiles point at).
+# Requires the per-room helpers in status_helpers.yaml (the input_boolean
+# linked in each automation's "Status output", plus the template sensor the
+# tiles point at).
 #
 # Install: Settings -> Dashboards -> + Add dashboard -> New dashboard from
 # scratch -> open it -> Edit -> (three dots) -> Raw configuration editor ->
