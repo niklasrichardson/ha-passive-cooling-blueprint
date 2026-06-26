@@ -265,7 +265,7 @@ blueprint:
       icon: mdi:export
       collapsed: true
       input:
-        recommendation_helper:
+        status_helper:
           name: Status helper (optional)
           description: >-
             Optional input_boolean that reflects this room's current
@@ -417,7 +417,7 @@ trigger_variables:
   converge_rate_global: !input minimum_convergence_rate_global
   stability_dur: !input stability_duration
   stability_global: !input stability_duration_global
-  rec_helper: !input recommendation_helper
+  rec_helper: !input status_helper
 
 # Two template triggers. A template trigger fires only on the rising edge, when
 # its template result goes from false to true, and not again until it has gone
@@ -578,7 +578,7 @@ variables:
     {{ ((states(inside_trend_entity) | float(0))
         - (states(outside_trend_entity) | float(0))) | round(2) }}
   recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
-  recommendation_helper: !input recommendation_helper
+  status_helper: !input status_helper
 
 # Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid
 # numbers right now. The triggers already require this, but a sensor can drop to
@@ -605,13 +605,13 @@ actions:
           # when one is configured. choose/default runs the user action list.
           - if:
               - condition: template
-                value_template: "{{ recommendation_helper not in ('', none) }}"
+                value_template: "{{ status_helper not in ('', none) }}"
             then:
               - action: input_boolean.turn_on
                 target:
                   entity_id: >-
-                    {{ [recommendation_helper]
-                       if recommendation_helper not in ('', none) else [] }}
+                    {{ [status_helper]
+                       if status_helper not in ('', none) else [] }}
           - choose: []
             default: !input open_action
       - conditions:
@@ -622,12 +622,12 @@ actions:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ recommendation_helper not in ('', none) }}"
+                value_template: "{{ status_helper not in ('', none) }}"
             then:
               - action: input_boolean.turn_off
                 target:
                   entity_id: >-
-                    {{ [recommendation_helper]
-                       if recommendation_helper not in ('', none) else [] }}
+                    {{ [status_helper]
+                       if status_helper not in ('', none) else [] }}
           - choose: []
             default: !input close_action

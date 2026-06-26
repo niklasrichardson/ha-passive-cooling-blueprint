@@ -156,7 +156,7 @@ class BlueprintStructureTests(unittest.TestCase):
             "close_temperature_difference_global",
             "minimum_convergence_rate_global",
             "stability_duration_global",
-            "recommendation_helper",
+            "status_helper",
             "open_action",
             "close_action",
             "open_additional_conditions",
@@ -197,16 +197,16 @@ class BlueprintStructureTests(unittest.TestCase):
             self.assertIn("default", inputs[key], key)
             self.assertEqual(inputs[key]["default"], "", key)
 
-    def test_recommendation_helper_is_optional_input_boolean(self):
+    def test_status_helper_is_optional_input_boolean(self):
         inputs = {}
         for section in self.blueprint["input"].values():
             inputs.update(section["input"])
-        helper = inputs["recommendation_helper"]
+        helper = inputs["status_helper"]
         self.assertEqual(helper["default"], "")
         filt = helper["selector"]["entity"]["filter"][0]
         self.assertEqual(filt["domain"], "input_boolean")
 
-    def test_actions_set_recommendation_helper(self):
+    def test_actions_set_status_helper(self):
         # The open branch turns the helper on; the close branch turns it off.
         actions = self.doc["actions"]
         branches = actions[0]["choose"]
