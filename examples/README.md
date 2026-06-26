@@ -112,3 +112,33 @@ every automation:
 
 A linked helper overrides that automation's local number; leave a global blank
 to keep using the local value.
+
+## Per-room recommendation tiles
+
+The blueprint's optional **Recommendation helper** output keeps a per-room
+`input_boolean` in sync (on = open recommended, off = close), so you can build a
+status board with native tile cards — no custom cards required.
+
+[`recommendation_helpers.yaml`](./recommendation_helpers.yaml) sets up two things
+per room:
+
+1. an **`input_boolean`** the automation writes to (on = open recommended), and
+2. a **template `binary_sensor`** with `device_class: window` that mirrors it.
+   The window device class gives the tile an **Open/Closed** state, a window icon
+   that changes with state, and **state-based colour**; it also carries the
+   room's current **temperature** as an attribute.
+
+Then:
+
+1. Paste `recommendation_helpers.yaml` into your config and restart (adjust the
+   temperature sensor entity ids to your rooms).
+2. In each automation, link its `input_boolean` under *Recommendation output
+   (optional)*.
+3. Add [`overview_dashboard.yaml`](./overview_dashboard.yaml): a prominent
+   outside-temperature tile, then one tile per room showing the recommendation
+   (Open/Closed, lit green when open) and the room temperature together (via the
+   tile's `state_content`).
+
+Because the recommendation only changes on the open/close edges, the helper
+holds the **current standing recommendation** — there is no separate "no action"
+state (the hysteresis hold simply keeps the last decision).

@@ -1,0 +1,47 @@
+# Standalone "rooms" dashboard for the Passive Cooling Window Recommendation
+# blueprint. A prominent outside-temperature tile, then one tile per room
+# showing the recommendation ("Open"/"Close" with a window icon) and the room's
+# current temperature together.
+#
+# Requires the per-room helpers in recommendation_helpers.yaml (the input_boolean
+# linked in each automation's "Recommendation helper" output, plus the template
+# sensor the tiles point at).
+#
+# Install: Settings -> Dashboards -> + Add dashboard -> New dashboard from
+# scratch -> open it -> Edit -> (three dots) -> Raw configuration editor ->
+# paste. Adjust the entity ids to match your rooms.
+
+title: Passive Cooling
+views:
+  - title: Rooms
+    path: rooms
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        title: Outside
+        cards:
+          - type: tile
+            entity: sensor.average_outside_temperature
+            name: Outside temperature
+            icon: mdi:home-thermometer-outline
+      - type: grid
+        title: Rooms
+        cards:
+          # Tiles point at the template binary_sensors (device_class: window):
+          # Open/Closed state, a window icon, state colour, and the room
+          # temperature via state_content.
+          - type: tile
+            entity: binary_sensor.master_bedroom_windows
+            name: Master Bedroom
+            color: green
+            state_content:
+              - state
+              - temperature
+          - type: tile
+            entity: binary_sensor.study_windows
+            name: Study
+            color: green
+            state_content:
+              - state
+              - temperature

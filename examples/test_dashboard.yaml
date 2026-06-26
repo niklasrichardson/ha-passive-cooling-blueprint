@@ -8,11 +8,15 @@
 #
 # Replace `automation.passive_cooling_test_room` with your test automation's
 # entity id, and adjust the input_number / sensor ids if your helpers differ.
+#
+# The recommendation toggle (input_boolean.passive_cooling_test_room) shows the
+# latch state (on = open). Link it in the test automation's "Recommendation
+# output", and flip it off to reset the latch between runs.
 
-title: Passive Cooling Test
+title: Tests
 views:
-  - title: Test
-    path: test
+  - title: Passive Cooling Tests
+    path: passive-cooling-tests
     type: sections
     max_columns: 2
     sections:
@@ -33,6 +37,7 @@ views:
               {% set out = states('input_number.test_outdoor_temperature')|float(0) %}
               {% set it = states('input_number.test_indoor_temperature_trend')|float(0) %}
               {% set ot = states('input_number.test_outdoor_temperature_trend')|float(0) %}
+              {% set latch = states('input_boolean.passive_cooling_test_room') %}
               {% set diff = (ind-out)|round(2) %}
               {% set dt = (it-ot)|round(2) %}
               {% set open_now = ind >= 22 and diff >= 1.0 %}
@@ -45,6 +50,7 @@ views:
               - Difference trend: **{{ dt }}°/h** → {{ 'converging ✅' if conv else 'not converging' }}
               - Min-indoor gate (≥22°): {{ 'pass' if ind >= 22 else '**BLOCKS open** ❌' }}
               {% if close_now %}- Close path: **{{ 'EARLY (trend)' if early else 'base (equilibrium)' }}**{% endif %}
+              - Latch (helper): **{{ latch }}** → open {{ 'allowed' if latch != 'on' else 'blocked (already open)' }}, close {{ 'allowed' if latch == 'on' else 'blocked (not open)' }}
 
       - type: grid
         title: Scenarios
@@ -69,6 +75,7 @@ views:
               - {entity: sensor.test_outdoor_temperature, name: Outdoor sensor}
               - {entity: sensor.test_indoor_temperature_trend, name: Indoor trend}
               - {entity: sensor.test_outdoor_temperature_trend, name: Outdoor trend}
+              - {entity: input_boolean.passive_cooling_test_room, name: Recommendation (on = open)}
               - {entity: automation.passive_cooling_test_room, secondary_info: last-triggered}
           - type: logbook
             title: 📜 Automation activity

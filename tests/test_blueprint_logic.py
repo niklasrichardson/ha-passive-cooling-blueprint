@@ -117,6 +117,7 @@ def render(
     # An unconfigured trend input is an empty entity id; states('') -> unknown.
     globals_["states"] = lambda entity: states.get(entity, "unknown")
     globals_["is_number"] = ha_is_number
+    globals_["is_state"] = lambda entity, value: states.get(entity, "unknown") == value
     result = env.from_string(template_str).render(**globals_).strip()
     return result.lower() == "true"
 
@@ -154,6 +155,7 @@ class BlueprintStructureTests(unittest.TestCase):
             "close_temperature_difference_global",
             "minimum_convergence_rate_global",
             "stability_duration_global",
+            "recommendation_helper",
             "open_action",
             "close_action",
             "open_additional_conditions",
@@ -193,6 +195,31 @@ class BlueprintStructureTests(unittest.TestCase):
         ):
             self.assertIn("default", inputs[key], key)
             self.assertEqual(inputs[key]["default"], "", key)
+
+    def test_recommendation_helper_is_optional_input_boolean(self):
+        inputs = {}
+        for section in self.blueprint["input"].values():
+            inputs.update(section["input"])
+        helper = inputs["recommendation_helper"]
+        self.assertEqual(helper["default"], "")
+        filt = helper["selector"]["entity"]["filter"][0]
+        self.assertEqual(filt["domain"], "input_boolean")
+
+    def test_actions_set_recommendation_helper(self):
+        # The open branch turns the helper on; the close branch turns it off.
+        actions = self.doc["actions"]
+        branches = actions[0]["choose"]
+        flat = str(branches)
+        self.assertIn("input_boolean.turn_on", flat)
+        self.assertIn("input_boolean.turn_off", flat)
+        # entity_id must be a TEMPLATE (string), not a bare !input. When no helper
+        # is linked the input is "", and a literal empty entity_id fails Home
+        # Assistant config validation. A template yields an empty list instead.
+        for branch in branches:
+            then_step = branch["sequence"][0]["then"][0]
+            entity_id = then_step["target"]["entity_id"]
+            self.assertIsInstance(entity_id, str, "entity_id must be a template string")
+            self.assertIn("{{", entity_id, "entity_id must be templated")
 
     def test_temperature_sensors_filter_for_temperature(self):
         inputs = {}
@@ -238,6 +265,7 @@ class TriggerTemplateTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
+        "rec_helper": "",
     }
 
     def setUp(self):
@@ -424,6 +452,7 @@ class TrendEarlyCloseTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
+        "rec_helper": "",
     }
 
     def setUp(self):
@@ -486,6 +515,23 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # ...but the base equilibrium close still works.
         self.assertTrue(self.close("22.4", "22.0", "unavailable", "unknown"))
 
+    def test_evening_widening_gap_suppresses_close(self):
+        # diff 0.4 (in the close band) but outside dropping fast -> the gap is
+        # widening, so keep ventilating instead of closing.
+        self.assertFalse(self.close("28.9", "28.5", "0.0", "-1.0"))
+
+    def test_morning_converging_still_closes_at_equilibrium(self):
+        # diff 0.4 with outside RISING (gap closing) -> equilibrium close stands.
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "1.0"))
+
+    def test_widening_but_outside_warmer_still_closes(self):
+        # Outside warmer (diff -0.5): always close, even if it is cooling fast.
+        self.assertTrue(self.close("22.0", "22.5", "0.0", "-2.0"))
+
+    def test_widening_below_rate_still_closes(self):
+        # Gap widening slower than the convergence rate (0.1/h) -> still closes.
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "-0.05"))
+
 
 class GlobalOverrideTests(unittest.TestCase):
     """A configured, valid global helper overrides the per-automation number;
@@ -504,6 +550,7 @@ class GlobalOverrideTests(unittest.TestCase):
         "close_diff_global": "",
         "converge_rate_input": 0.1,
         "converge_rate_global": "",
+        "rec_helper": "",
     }
 
     def setUp(self):
@@ -667,6 +714,105 @@ class StabilityDurationForTests(unittest.TestCase):
                 300,
                 bad,
             )
+
+
+class RecommendationLatchTests(unittest.TestCase):
+    """When a recommendation helper is linked it latches the recommendation:
+    open fires only while the helper is off, close only while it is on, so a
+    difference that merely oscillates across a threshold cannot re-fire."""
+
+    HELPER = "input_boolean.passive_cooling_room"
+    BASE = {
+        "inside_entity": "sensor.inside",
+        "outside_entity": "sensor.outside",
+        "inside_trend_entity": "",
+        "outside_trend_entity": "",
+        "min_indoor_input": 22.0,
+        "min_indoor_global": "",
+        "open_diff_input": 1.0,
+        "open_diff_global": "",
+        "close_diff_input": 0.5,
+        "close_diff_global": "",
+        "converge_rate_input": 0.1,
+        "converge_rate_global": "",
+        "rec_helper": "",
+    }
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.templates = {
+            trig["id"]: trig["value_template"] for trig in doc["triggers"]
+        }
+
+    def _render(self, which, inside, outside, *, helper_linked, helper_state):
+        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        return render(
+            self.templates[which],
+            inside_state=inside,
+            outside_state=outside,
+            context=ctx,
+            extra_states={self.HELPER: helper_state},
+        )
+
+    def test_open_blocked_when_already_open(self):
+        # Open conditions met, but helper already on -> do not re-open.
+        self.assertFalse(
+            self._render("open", "25.0", "20.0", helper_linked=True, helper_state="on")
+        )
+
+    def test_open_allowed_when_not_open(self):
+        self.assertTrue(
+            self._render("open", "25.0", "20.0", helper_linked=True, helper_state="off")
+        )
+
+    def test_close_blocked_when_not_open(self):
+        # Close conditions met, but helper off (not currently open) -> no close.
+        self.assertFalse(
+            self._render("close", "22.4", "22.0", helper_linked=True, helper_state="off")
+        )
+
+    def test_close_allowed_when_open(self):
+        self.assertTrue(
+            self._render("close", "22.4", "22.0", helper_linked=True, helper_state="on")
+        )
+
+    def _simulate(self, sequence, *, helper_linked):
+        """Replay a sequence, modelling the action toggling the latch helper."""
+        helper = "off"
+        opens = closes = 0
+        prev_open = prev_close = False
+        ctx = dict(self.BASE, rec_helper=self.HELPER if helper_linked else "")
+        for inside_state, outside_state in sequence:
+            extra = {self.HELPER: helper}
+            o = render(self.templates["open"], inside_state=inside_state,
+                       outside_state=outside_state, context=ctx, extra_states=extra)
+            c = render(self.templates["close"], inside_state=inside_state,
+                       outside_state=outside_state, context=ctx, extra_states=extra)
+            if o and not prev_open:
+                opens += 1
+                helper = "on"
+            elif c and not prev_close:
+                closes += 1
+                helper = "off"
+            prev_open, prev_close = o, c
+        return opens, closes
+
+    # A room at the open threshold: inside steady, outside drifting across it.
+    OSCILLATION = [
+        ("31.2", "30.1"),  # diff 1.1 -> open
+        ("31.2", "30.3"),  # diff 0.9 -> dead band
+        ("31.2", "30.1"),  # diff 1.1 -> open again
+        ("31.2", "30.3"),  # diff 0.9 -> dead band
+        ("31.2", "30.1"),  # diff 1.1 -> open again
+    ]
+
+    def test_oscillation_repeats_without_helper(self):
+        opens, _ = self._simulate(self.OSCILLATION, helper_linked=False)
+        self.assertEqual(opens, 3)  # the bug: one notification per re-crossing
+
+    def test_oscillation_fires_once_with_latch(self):
+        opens, _ = self._simulate(self.OSCILLATION, helper_linked=True)
+        self.assertEqual(opens, 1)  # latched: a single notification
 
 
 if __name__ == "__main__":

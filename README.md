@@ -25,8 +25,10 @@ notification, a TTS announcement, a light, a script, anything.
 - [Hysteresis: why two thresholds](#hysteresis-why-two-thresholds)
 - [Minimum indoor temperature](#minimum-indoor-temperature)
 - [Stability duration](#stability-duration)
+- [The algorithm (and the science behind it)](#the-algorithm-and-the-science-behind-it)
 - [Trend awareness: early close (optional)](#trend-awareness-early-close-optional)
 - [Sharing settings across rooms (global overrides)](#sharing-settings-across-rooms-global-overrides)
+- [Recommendation output for dashboards (optional)](#recommendation-output-for-dashboards-optional)
 - [How state is tracked (and restart behaviour)](#how-state-is-tracked)
 - [Installing the blueprint](#installing-the-blueprint)
 - [Creating one automation per room](#creating-one-automation-per-room)
@@ -125,6 +127,66 @@ A recommendation must hold steady for this long before its action runs (default
 option and smooths out brief sensor spikes — a single stray reading will not
 trigger a notification.
 
+## The algorithm (and the science behind it)
+
+At heart this is a small **controls layer for night-ventilation cooling** (also
+called *night flushing*): ventilate while outdoor air can carry heat out of the
+room, and stop before it stops helping. It is deliberately simple, but it is
+built from a handful of well-established control and building-science ideas:
+
+- **Differential (ΔT) control — "free cooling".** Decisions are driven by the
+  *difference* between indoor and outdoor temperature, the same idea as an
+  air-side **economizer** that draws in outdoor air whenever it is cooler than
+  inside. (→ the open rule.)
+- **Hysteresis — a dead-band.** Two thresholds, not one — exactly how a
+  thermostat avoids chattering around a single setpoint. Opening needs a clear
+  gap; closing needs the gap to nearly vanish; in between, nothing changes.
+  (→ open vs close thresholds.)
+- **A comfort gate.** The minimum indoor temperature is a lower comfort bound —
+  there is no point cooling a room that is already cool. (→ minimum indoor
+  temperature.)
+- **Debouncing — a low-pass filter.** The stability duration makes a
+  recommendation prove itself before acting, so a single stray reading does not
+  fire an action. (→ stability duration.)
+- **A derivative term — a step toward predictive control.** Optional trend
+  sensors add the *rate of change*. It does not forecast; it asks "which way is
+  the gap heading right now?" — closing early when the gap is collapsing
+  (morning) and holding open when it is widening (evening). (→ trend awareness.)
+- **A latch — a small state machine.** An optional helper stores the standing
+  recommendation, so each edge-triggered recommendation fires once per real
+  change rather than re-firing on noise. (→ recommendation output.)
+
+Concretely, with `difference = inside − outside` (positive means outside cooler):
+
+```
+OPEN   when  inside ≥ minimum indoor temperature
+         AND difference ≥ open threshold
+CLOSE  when  difference ≤ close threshold
+HOLD   otherwise — the hysteresis dead-band (close < difference < open),
+             where the current recommendation simply persists
+```
+
+**With trend sensors** (these refine the **close** only; opening is always the
+instantaneous rule above). Let `difference_trend = inside_trend − outside_trend`
+— negative means the gap is *closing*, positive means it is *widening*:
+
+- **Early close (morning).** If `difference` is in the dead-band *and* the gap is
+  closing faster than the convergence rate (`difference_trend ≤ −rate`), close
+  early instead of waiting for full equilibrium.
+- **Evening hold.** If `difference ≤ close threshold` *but* the gap is widening
+  (`difference_trend ≥ +rate`) while outside is still cooler (`difference > 0`),
+  **do not** close — keep ventilating into the cool-down. If outside is actually
+  warmer (`difference ≤ 0`), it always closes regardless of trend.
+
+**With a recommendation helper linked (latch).** Open fires only when the helper
+is off (not already open) and close only when it is on (currently open), so a
+`difference` that merely oscillates across a threshold can't re-send the same
+recommendation.
+
+What it deliberately **does not** model: thermal mass, weather forecasts, airflow
+rate (a cracked window ≠ cross-ventilation), or humidity — see
+[Limitations](#limitations). Each mechanism above has its own section below.
+
 ## Trend awareness: early close (optional)
 
 Plain thresholds are reactive — they wait until the indoor and outdoor
@@ -161,9 +223,15 @@ recommends closing early. This deliberately captures the cases you described:
   temperature ticked up.
 - **Don't make the room hotter than it was.** Closing before full equilibrium
   means you stop pulling in air that is no longer meaningfully cooler.
+- **Evening cool-down — keep ventilating.** The mirror image: when the gap is
+  near equilibrium but *widening* because outside is dropping faster than the
+  room (a typical evening), the blueprint **suppresses** the equilibrium close so
+  you keep capturing the cooling. If outside is actually *warmer* (difference ≤
+  0) it always closes, regardless of trend.
 
 The open recommendation is **unchanged** by trends — opening still happens on the
-instantaneous threshold. Trends refine only the *close* decision.
+instantaneous threshold. Trends refine only the *close* decision (closing early
+when the gap is shrinking, and holding open when it is widening in your favour).
 
 ### Setting up the derivative sensors
 
@@ -186,11 +254,17 @@ awareness entirely** — the blueprint then behaves exactly as the
 temperature-only version. If a trend sensor is missing or invalid, the blueprint
 safely falls back to the plain equilibrium close.
 
-> **Evening "start ventilating" question.** Opening is intentionally still driven
-> by the instantaneous open threshold, so you start ventilating as soon as the
-> outside is genuinely cooler — without the risk of opening early into marginal
-> or still-rising outdoor air. Symmetric *early open* is noted in `TODO.md` as a
-> possible future option.
+> **Evening behaviour.** The evening cool-down is handled on the *close* side:
+> when outside is still cooler and actively dropping, the equilibrium close is
+> suppressed so you keep ventilating (see the "Evening cool-down" point above).
+> *Opening* is still driven by the instantaneous open threshold — you start
+> ventilating as soon as outside is genuinely cooler, without the risk of opening
+> early into marginal or still-rising outdoor air. A symmetric *early open* is
+> noted in `TODO.md` as a possible future option.
+>
+> No trend sensors? A simple alternative is to lower the close threshold (e.g. to
+> `0.0`) so windows stay "open" while outside is cooler and only close once
+> outside is no longer cooler.
 
 ## Sharing settings across rooms (global overrides)
 
@@ -216,6 +290,37 @@ new value on the next trigger evaluation. To make one room differ, just leave it
 global blank and use the number field. An invalid or unavailable helper safely
 falls back to the per-automation number, so a broken helper never stops the
 automation.
+
+## Recommendation output for dashboards (optional)
+
+The blueprint runs your open/close *actions*, but doesn't itself create an
+entity you can put on a dashboard. To get a per-room status you can show, link
+an optional **recommendation helper**: an `input_boolean` the automation turns
+**on** when opening is recommended and **off** when closing is recommended (in
+addition to your normal actions).
+
+- Create one `input_boolean` per room and link it under *Recommendation output*.
+- For a polished, fully-native board, mirror each `input_boolean` with a template
+  `binary_sensor` (`device_class: window`): tiles show **Open/Closed**, a window
+  icon, state-based colour, and the room temperature (carried as an attribute) —
+  all on one tile, no custom cards. See [`examples/`](./examples) for
+  ready-to-paste helpers and a tile dashboard (with an outside-temperature tile).
+
+Because the recommendation only changes on the open/close edges, the helper
+holds the **current standing recommendation** (on = open, off = close). There is
+no separate "no action" state — the hysteresis hold simply keeps the last
+decision. Leave the input blank to disable this entirely.
+
+### It also stops repeat notifications
+
+Linking a helper does more than feed a dashboard — it **latches** the
+recommendation. The open action fires only while the helper is off and the close
+action only while it is on, so a room whose indoor/outdoor difference merely
+*oscillates across a threshold* (without crossing into the other band) can't
+re-send the same recommendation. This is the robust fix for repeated "open"
+notifications on rooms sitting right at the open threshold. Without a helper
+linked, behaviour is unchanged and such oscillation can re-fire — so linking a
+helper per room is recommended if you see repeats.
 
 ## How state is tracked
 

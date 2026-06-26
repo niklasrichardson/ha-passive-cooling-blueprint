@@ -4,6 +4,52 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-25
+
+### Added
+
+- **Optional recommendation output for dashboards.** A new `recommendation_helper`
+  input (an `input_boolean`) that the automation turns **on** when opening is
+  recommended and **off** when closing is recommended, in addition to your
+  open/close actions. Leave it blank to disable. Enables a per-room status board
+  with native tile cards.
+- `examples/recommendation_helpers.yaml` (per-room `input_boolean` plus a
+  template `binary_sensor` with `device_class: window` for native Open/Closed
+  tiles with an icon, state colour, and the room temperature as an attribute)
+  and a tile-based `examples/overview_dashboard.yaml` with an outside-temperature
+  tile and per-room recommendation + temperature tiles.
+- Tests asserting the helper is an optional `input_boolean` input and that the
+  open/close branches set it on/off.
+- **Naming-convention examples** in the input descriptions (suggested entity ids
+  for the sensors, trend sensors, global helpers and the recommendation helper)
+  and a **"The algorithm (and the science behind it)"** README section that
+  frames the open/close logic in terms of the control and building-science ideas
+  it draws on (differential/"free cooling" control, hysteresis dead-band, a
+  comfort gate, debouncing, a derivative/predictive term, and a latch) and gives
+  the rules with and without trend sensors.
+
+- **Evening cool-down (trend-aware close suppression).** When trend sensors are
+  configured and the indoor/outdoor gap is near equilibrium but *widening*
+  (outside dropping faster than the room) while outside is still cooler, the
+  equilibrium close is suppressed so an evening cool-down keeps ventilating. If
+  outside is warmer (difference ≤ 0) it always closes. The mirror image of the
+  morning early close; reuses the minimum convergence rate. Without trend sensors
+  the close is unchanged (tip: lower the close threshold toward `0.0`).
+- **Recommendation latch (repeat-notification fix).** When a recommendation
+  helper is linked, the open trigger is gated on the helper being off and the
+  close trigger on it being on. A difference that merely oscillates across a
+  threshold (without crossing into the other band) can no longer re-send the
+  same recommendation — fixing repeat "open" notifications on rooms sitting at
+  the open threshold. Tests simulate an oscillating room firing once (with the
+  latch) versus repeatedly (without).
+
+### Notes
+
+- The recommendation is edge-based, so the helper holds the current standing
+  recommendation (on = open, off = close); there is no separate "no action"
+  state. Optional and off by default — without a helper linked, behaviour is
+  unchanged (and threshold oscillation can re-fire).
+
 ## [0.4.0] - 2026-06-25
 
 ### Added
@@ -123,6 +169,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.yamllint`, and a `.github/workflows/validate.yml` CI workflow.
 - MIT license and credits to Adam Cornforth's Dynamic Ventilation blueprint.
 
+[0.5.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.5.0
 [0.4.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.4.0
 [0.3.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.3.0
 [0.2.0]: https://github.com/niklasrichardson/ha-passive-cooling-blueprint/releases/tag/v0.2.0
