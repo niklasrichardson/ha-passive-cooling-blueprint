@@ -96,7 +96,7 @@ blueprint:
             Only recommend opening windows when the room is at least this warm.
             Prevents passive-cooling recommendations during cold weather. Enter
             this value in the same unit your sensors report (°C or °F).
-          default: 22.0
+          default: 19.0
           selector:
             number:
               min: 0.0

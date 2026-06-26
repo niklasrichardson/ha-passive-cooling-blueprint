@@ -65,7 +65,7 @@ All of the following must hold, continuously, for the [stability
 duration](#stability-duration):
 
 1. The room is **at or above** the minimum indoor temperature (default
-   `22.0°`). No point cooling a room that is already cool.
+   `19.0°`). No point cooling a room that is already cool.
 2. The outdoor sensor is **at least the open threshold cooler** than indoors
    (default `1.0°`), i.e. `inside − outside ≥ open threshold`.
 3. Both sensors report valid numbers.
@@ -507,7 +507,7 @@ use_blueprint:
     room_name: Master bedroom
     inside_temperature_sensor: sensor.master_bedroom_temperature
     outside_temperature_sensor: sensor.average_outside_temperature
-    minimum_indoor_temperature: 22
+    minimum_indoor_temperature: 19
     open_temperature_difference: 1
     close_temperature_difference: 0.5
     stability_duration:
@@ -551,8 +551,8 @@ unit conversion of its own**. That means it works on Fahrenheit installations,
 with two things to keep in mind:
 
 - **Enter every threshold in your sensors' unit.** On a Fahrenheit system the
-  defaults (min `22`, open `1.0`, close `0.5`) are Celsius values and make no
-  sense — use Fahrenheit equivalents, e.g. minimum `72`, open difference `2`,
+  defaults (min `19`, open `1.0`, close `0.5`) are Celsius values and make no
+  sense — use Fahrenheit equivalents, e.g. minimum `66`, open difference `2`,
   close difference `1`. The number selectors show a generic `°` so they do not
   imply Celsius.
 - **Both sensors must use the same unit.** Home Assistant converts a temperature
