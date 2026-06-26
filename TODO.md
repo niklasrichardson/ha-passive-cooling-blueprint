@@ -3,6 +3,17 @@
 Tracking ideas for future releases. The first release (`0.1.0`) is intentionally
 scoped to the temperature-only passive-cooling use case.
 
+## Done in 0.3.0 – 0.5.0
+
+- [x] Optional Area input with automatic room naming (`area_name`). (0.3.0)
+- [x] Copy-paste action examples in the editor; testing rig under `examples/`. (0.3.0)
+- [x] Global overrides for shared settings across many automations. (0.4.0)
+- [x] Optional recommendation output (`input_boolean`) + native tile dashboard. (0.5.0)
+- [x] Recommendation latch: gate open/close on the helper to stop repeat
+      notifications from threshold oscillation. (0.5.0)
+- [x] Evening cool-down: trend-aware suppression of the equilibrium close when
+      the gap is widening while outside is still cooler. (0.5.0)
+
 ## Done in 0.2.0
 
 - [x] Optional trend awareness via indoor/outdoor derivative sensors.
@@ -24,21 +35,16 @@ scoped to the temperature-only passive-cooling use case.
 
 ## Considering for future releases
 
-- [ ] **Optional state-helper input** (`input_select` / `input_text`) for a
-      strict, persistent open→close state machine and explicit state
-      re-assertion after a restart. Would keep the helper-free default while
-      letting power users opt in. Resolves the two documented edge cases in the
-      README "How state is tracked" section.
 - [ ] Symmetric early-OPEN: in the evening, anticipate the cool-down and start
-      ventilating slightly before the full open threshold when the gap is
-      opening up. Deliberately deferred to avoid opening into marginal/rising
-      outdoor temperatures; the instantaneous open threshold handles this today.
-- [ ] Optional "current recommendation" sensor/attribute for dashboards.
+      ventilating slightly *before* the full open threshold. Deferred to avoid
+      opening into marginal/rising outdoor air. (Note: the evening *close*
+      suppression added in 0.5.0 already handles "keep ventilating" once open.)
 - [ ] Per-recommendation stability durations (separate open vs close timing).
 - [ ] Soft validation/warning when the open threshold is not greater than the
       close threshold (currently only documented).
-- [ ] Example Lovelace card showing the current recommendation.
 - [ ] HACS metadata for distribution.
+- [ ] Easy-deploy generator + quickstart (per-room helpers / sensors / dashboard
+      from a simple room list).
 
 ## Explicitly out of scope (per project requirements)
 

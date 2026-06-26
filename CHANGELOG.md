@@ -21,6 +21,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Tests asserting the helper is an optional `input_boolean` input and that the
   open/close branches set it on/off.
 
+- **Evening cool-down (trend-aware close suppression).** When trend sensors are
+  configured and the indoor/outdoor gap is near equilibrium but *widening*
+  (outside dropping faster than the room) while outside is still cooler, the
+  equilibrium close is suppressed so an evening cool-down keeps ventilating. If
+  outside is warmer (difference ≤ 0) it always closes. The mirror image of the
+  morning early close; reuses the minimum convergence rate. Without trend sensors
+  the close is unchanged (tip: lower the close threshold toward `0.0`).
 - **Recommendation latch (repeat-notification fix).** When a recommendation
   helper is linked, the open trigger is gated on the helper being off and the
   close trigger on it being on. A difference that merely oscillates across a

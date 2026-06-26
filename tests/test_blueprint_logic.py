@@ -507,6 +507,23 @@ class TrendEarlyCloseTests(unittest.TestCase):
         # ...but the base equilibrium close still works.
         self.assertTrue(self.close("22.4", "22.0", "unavailable", "unknown"))
 
+    def test_evening_widening_gap_suppresses_close(self):
+        # diff 0.4 (in the close band) but outside dropping fast -> the gap is
+        # widening, so keep ventilating instead of closing.
+        self.assertFalse(self.close("28.9", "28.5", "0.0", "-1.0"))
+
+    def test_morning_converging_still_closes_at_equilibrium(self):
+        # diff 0.4 with outside RISING (gap closing) -> equilibrium close stands.
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "1.0"))
+
+    def test_widening_but_outside_warmer_still_closes(self):
+        # Outside warmer (diff -0.5): always close, even if it is cooling fast.
+        self.assertTrue(self.close("22.0", "22.5", "0.0", "-2.0"))
+
+    def test_widening_below_rate_still_closes(self):
+        # Gap widening slower than the convergence rate (0.1/h) -> still closes.
+        self.assertTrue(self.close("22.4", "22.0", "0.0", "-0.05"))
+
 
 class GlobalOverrideTests(unittest.TestCase):
     """A configured, valid global helper overrides the per-automation number;

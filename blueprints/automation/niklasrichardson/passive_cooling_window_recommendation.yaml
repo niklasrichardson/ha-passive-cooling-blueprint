@@ -405,9 +405,11 @@ trigger_variables:
 # cannot re-send the same recommendation. Without a helper linked, behaviour is
 # unchanged (and such oscillation can re-fire).
 #
-# Trend awareness (optional) refines only the CLOSE trigger: inside the
-# hysteresis gap, if the gap is actively closing toward equilibrium, we close
-# early to lock in the cooler air before the room warms back up.
+# Trend awareness (optional) refines only the CLOSE trigger, both ways:
+#   * Morning (gap closing toward equilibrium): close EARLY, inside the
+#     hysteresis gap, to lock in the cooler air before the room warms back up.
+#   * Evening (gap widening, outside still cooler): SUPPRESS the equilibrium
+#     close so an active evening cool-down keeps ventilating.
 triggers:
   - trigger: template
     id: open
@@ -462,10 +464,17 @@ triggers:
       {% set early_close = converging
          and (diff > close_diff)
          and (diff < open_diff) %}
+      {# Evening: the gap is widening in our favour (outside dropping faster than
+         the room) while outside is still cooler. Keep ventilating - suppress the
+         equilibrium close so an evening cool-down isn't cut short. #}
+      {% set widening = (has_in or has_out)
+         and ((inside_rate - outside_rate) >= converge_rate)
+         and (diff > 0) %}
+      {% set base_close = (diff <= close_diff) and not widening %}
       {# Latch: when a helper is linked, only close if currently open. #}
       {% set has_latch = rec_helper not in ('', none) %}
       {% set may_close = (not has_latch) or is_state(rec_helper, 'on') %}
-      {{ valid and ((diff <= close_diff) or early_close) and may_close }}
+      {{ valid and (base_close or early_close) and may_close }}
     for: >-
       {{ ((states(stability_global) | float) * 60) | int
          if (stability_global and is_number(states(stability_global)))

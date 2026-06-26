@@ -162,9 +162,15 @@ recommends closing early. This deliberately captures the cases you described:
   temperature ticked up.
 - **Don't make the room hotter than it was.** Closing before full equilibrium
   means you stop pulling in air that is no longer meaningfully cooler.
+- **Evening cool-down — keep ventilating.** The mirror image: when the gap is
+  near equilibrium but *widening* because outside is dropping faster than the
+  room (a typical evening), the blueprint **suppresses** the equilibrium close so
+  you keep capturing the cooling. If outside is actually *warmer* (difference ≤
+  0) it always closes, regardless of trend.
 
 The open recommendation is **unchanged** by trends — opening still happens on the
-instantaneous threshold. Trends refine only the *close* decision.
+instantaneous threshold. Trends refine only the *close* decision (closing early
+when the gap is shrinking, and holding open when it is widening in your favour).
 
 ### Setting up the derivative sensors
 
@@ -187,11 +193,17 @@ awareness entirely** — the blueprint then behaves exactly as the
 temperature-only version. If a trend sensor is missing or invalid, the blueprint
 safely falls back to the plain equilibrium close.
 
-> **Evening "start ventilating" question.** Opening is intentionally still driven
-> by the instantaneous open threshold, so you start ventilating as soon as the
-> outside is genuinely cooler — without the risk of opening early into marginal
-> or still-rising outdoor air. Symmetric *early open* is noted in `TODO.md` as a
-> possible future option.
+> **Evening behaviour.** The evening cool-down is handled on the *close* side:
+> when outside is still cooler and actively dropping, the equilibrium close is
+> suppressed so you keep ventilating (see the "Evening cool-down" point above).
+> *Opening* is still driven by the instantaneous open threshold — you start
+> ventilating as soon as outside is genuinely cooler, without the risk of opening
+> early into marginal or still-rising outdoor air. A symmetric *early open* is
+> noted in `TODO.md` as a possible future option.
+>
+> No trend sensors? A simple alternative is to lower the close threshold (e.g. to
+> `0.0`) so windows stay "open" while outside is cooler and only close once
+> outside is no longer cooler.
 
 ## Sharing settings across rooms (global overrides)
 
