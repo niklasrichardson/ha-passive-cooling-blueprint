@@ -947,5 +947,107 @@ class ComprehensiveScenarioMatrixTests(unittest.TestCase):
                 self.assertFalse(o and c, f"{label}: open and close both fired")
 
 
+class ReasonMessageTests(unittest.TestCase):
+    """Render the ``reason`` and ``message`` action variables and assert they
+    explain the correct cause for each open/close path, with no stray whitespace
+    from the Jinja control blocks."""
+
+    IN = "sensor.inside"
+    OUT = "sensor.outside"
+    INT = "sensor.inside_trend"
+    OTT = "sensor.outside_trend"
+
+    def setUp(self):
+        doc = load_blueprint()
+        self.reason_t = doc["variables"]["reason"]
+        self.message_t = doc["variables"]["message"]
+
+    def _render(self, template, **ctx):
+        env = make_env()
+        result = env.from_string(template).render(**ctx)
+        # Whitespace control: the rendered value must already be trimmed so it
+        # drops cleanly into a notification.
+        self.assertEqual(result, result.strip(),
+                         f"stray whitespace in render: {result!r}")
+        return result
+
+    def reason(self, trigger_id, inside, outside, *, in_trend=None,
+               out_trend=None, floor=19.0, close_t=0.5, open_t=1.0, rate=0.1):
+        states = {self.IN: str(inside), self.OUT: str(outside)}
+        in_ent = out_ent = ""
+        if in_trend is not None:
+            in_ent = self.INT
+            states[in_ent] = str(in_trend)
+        if out_trend is not None:
+            out_ent = self.OTT
+            states[out_ent] = str(out_trend)
+        return self._render(
+            self.reason_t,
+            states=lambda e: states.get(e, "unknown"),
+            is_number=ha_is_number,
+            trigger={"id": trigger_id},
+            inside_entity=self.IN, outside_entity=self.OUT,
+            inside_trend_entity=in_ent, outside_trend_entity=out_ent,
+            minimum_indoor_temperature=floor, close_threshold=close_t,
+            open_threshold=open_t, convergence_rate=rate,
+        )
+
+    def message(self, trigger_id, inside, outside, reason_text,
+                room="Test Room"):
+        return self._render(
+            self.message_t,
+            trigger={"id": trigger_id}, room_name=room,
+            inside_temperature=inside, outside_temperature=outside,
+            temperature_difference=round(inside - outside, 2),
+            reason=reason_text,
+        )
+
+    def test_open_reason_states_the_differential(self):
+        r = self.reason("open", 24.0, 20.0)
+        self.assertEqual(r, "outside is 4.0° cooler than inside")
+
+    def test_floor_close_reason(self):
+        # The screenshot case: inside at the comfort floor.
+        r = self.reason("close", 19.0, 14.9)
+        self.assertIn("comfort floor", r)
+        self.assertIn("19.0", r)
+
+    def test_floor_takes_priority_over_base(self):
+        # At the floor AND near equilibrium: the floor reason wins.
+        r = self.reason("close", 19.0, 18.7)
+        self.assertIn("comfort floor", r)
+
+    def test_early_close_reason(self):
+        # Dead-band, gap closing, outside genuinely warming.
+        r = self.reason("close", 25.0, 24.3, in_trend=0.0, out_trend=2.0)
+        self.assertIn("warming", r)
+        self.assertIn("locks in the cool", r)
+
+    def test_base_close_reason(self):
+        r = self.reason("close", 25.0, 24.6)
+        self.assertIn("evened out", r)
+
+    def test_message_is_paste_ready_for_floor_close(self):
+        r = self.reason("close", 19.0, 14.9)
+        m = self.message("close", 19.0, 14.9, r, room="Joshua's Bedroom")
+        self.assertIn("Joshua's Bedroom is 19.0° inside", m)
+        self.assertIn("14.9° outside", m)
+        self.assertIn("4.1° cooler out", m)
+        self.assertIn("close up to keep the cool in", m)
+        self.assertTrue(m.endswith("comfort floor (19.0°)."), m)
+
+    def test_message_open_uses_open_phrasing(self):
+        r = self.reason("open", 24.0, 20.0)
+        m = self.message("open", 24.0, 20.0, r)
+        self.assertIn("open up to cool it down", m)
+        self.assertIn("4.0° cooler out", m)
+
+    def test_message_handles_outside_warmer_sign(self):
+        # A base close can fire with outside slightly warmer (diff < 0).
+        r = self.reason("close", 24.0, 24.3)
+        m = self.message("close", 24.0, 24.3, r)
+        self.assertIn("0.3° warmer out", m)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

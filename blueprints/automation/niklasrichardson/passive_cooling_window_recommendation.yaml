@@ -221,11 +221,27 @@ blueprint:
 
             Available template variables: `room_name`, `inside_temperature`,
             `outside_temperature`, `temperature_difference`, `recommendation`,
-            `minimum_indoor_temperature`, `open_threshold`, `close_threshold`,
-            `inside_trend`, `outside_trend`, `difference_trend`.
+            `reason`, `message`, `minimum_indoor_temperature`, `open_threshold`,
+            `close_threshold`, `inside_trend`, `outside_trend`,
+            `difference_trend`.
 
-            Example — a mobile notification (replace `notify.notify` with your
-            own service, e.g. `notify.mobile_app_<your_phone>`):
+            `message` is a complete, ready-made notification body (room,
+            temperatures, the action and the reason) — paste `{{ message }}` for
+            a good default, or build your own from the parts. `reason` is just the
+            situation-aware "why" clause (e.g. "the room has cooled to your
+            comfort floor (19.0°)").
+
+            Example — paste the ready-made message:
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🪟 Open windows in {{ room_name }}"
+                message: "{{ message }}"
+            ```
+
+            Example — build your own (replace `notify.notify` with your own
+            service, e.g. `notify.mobile_app_<your_phone>`):
 
             ```yaml
             - action: notify.notify
@@ -235,7 +251,7 @@ blueprint:
                   {{ room_name }} is {{ inside_temperature | round(1) }}° inside
                   and {{ outside_temperature | round(1) }}° outside
                   ({{ temperature_difference | round(1) }}° cooler out) —
-                  open up to cool it down.
+                  {{ reason }}.
             ```
           selector:
             action: {}
@@ -243,10 +259,20 @@ blueprint:
           name: Close-windows action
           description: |
             Runs once when the recommendation changes to closing windows. The
-            same template variables are available as for the open action.
+            same template variables are available as for the open action,
+            including `message` (a ready-made body) and `reason` (the "why").
 
-            Example — a mobile notification (replace `notify.notify` with your
-            own service):
+            Example — paste the ready-made message:
+
+            ```yaml
+            - action: notify.notify
+              data:
+                title: "🌡️ Close windows in {{ room_name }}"
+                message: "{{ message }}"
+            ```
+
+            Example — build your own (replace `notify.notify` with your own
+            service):
 
             ```yaml
             - action: notify.notify
@@ -256,7 +282,7 @@ blueprint:
                   {{ room_name }} is {{ inside_temperature | round(1) }}° inside
                   and {{ outside_temperature | round(1) }}° outside
                   ({{ temperature_difference | round(1) }}° cooler out) —
-                  close up to keep the cool in.
+                  {{ reason }}.
             ```
           selector:
             action: {}
@@ -553,6 +579,8 @@ variables:
   open_diff_global: !input open_temperature_difference_global
   close_diff_input: !input close_temperature_difference
   close_diff_global: !input close_temperature_difference_global
+  converge_rate_input: !input minimum_convergence_rate
+  converge_rate_global: !input minimum_convergence_rate_global
   # Effective thresholds exposed to actions: global helper when set and valid,
   # otherwise the per-automation number (matching the trigger logic).
   minimum_indoor_temperature: >-
@@ -567,6 +595,10 @@ variables:
     {{ (states(close_diff_global) | float)
        if (close_diff_global and is_number(states(close_diff_global)))
        else (close_diff_input | float) }}
+  convergence_rate: >-
+    {{ (states(converge_rate_global) | float)
+       if (converge_rate_global and is_number(states(converge_rate_global)))
+       else (converge_rate_input | float) }}
   inside_temperature: "{{ states(inside_entity) | float(0) }}"
   outside_temperature: "{{ states(outside_entity) | float(0) }}"
   temperature_difference: >-
@@ -578,6 +610,41 @@ variables:
     {{ ((states(inside_trend_entity) | float(0))
         - (states(outside_trend_entity) | float(0))) | round(2) }}
   recommendation: "{{ 'Open windows' if trigger.id == 'open' else 'Close windows' }}"
+  # A short, situation-aware explanation of WHY this recommendation fired,
+  # mirroring the trigger logic. Use it on its own, or paste {{ message }} below
+  # for a complete ready-made notification. Close-path priority matches the
+  # trigger: comfort floor, then early (morning) close, then base equilibrium.
+  reason: >-
+    {%- set inside_now = states(inside_entity) | float(0) -%}
+    {%- set d = inside_now - (states(outside_entity) | float(0)) -%}
+    {%- set floor = minimum_indoor_temperature | float -%}
+    {%- set cd = close_threshold | float -%}
+    {%- set od = open_threshold | float -%}
+    {%- set cr = convergence_rate | float -%}
+    {%- set has_t = is_number(states(inside_trend_entity))
+                    or is_number(states(outside_trend_entity)) -%}
+    {%- set ir = states(inside_trend_entity) | float(0) -%}
+    {%- set orr = states(outside_trend_entity) | float(0) -%}
+    {%- set early = has_t and ((ir - orr) <= (-1.0 * cr))
+                    and (orr >= cr) and (d > cd) and (d < od) -%}
+    {{- ('outside is ' ~ (d | abs | round(1)) ~ '° cooler than inside')
+        if trigger.id == 'open'
+        else (('the room has cooled to your comfort floor ('
+               ~ (floor | round(1)) ~ '°)') if inside_now <= floor
+        else (('outside is warming and the gap is closing, so closing now '
+               ~ 'locks in the cool') if early
+        else 'inside and outside have evened out, so there is little more '
+             ~ 'cooling to gain')) -}}
+  # A complete, paste-ready notification body: room, temperatures, the action,
+  # and the reason. Drop {{ message }} straight into a notify service, or build
+  # your own from the individual variables above.
+  message: >-
+    {{ room_name }} is {{ inside_temperature | round(1) }}° inside and
+    {{ outside_temperature | round(1) }}° outside
+    ({{ temperature_difference | abs | round(1) }}°
+    {{ 'cooler' if temperature_difference >= 0 else 'warmer' }} out) —
+    {{ 'open up to cool it down' if trigger.id == 'open'
+       else 'close up to keep the cool in' }}: {{ reason }}.
   status_helper: !input status_helper
 
 # Belt-and-suspenders guard: never run an action unless BOTH sensors hold valid

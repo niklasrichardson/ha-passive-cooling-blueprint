@@ -23,6 +23,20 @@ combination.
 > `notify.notify` for your own service, and you're done. The examples below show
 > more variations.
 
+**Quickest — the ready-made `message`.** The `message` variable is a complete
+notification body that already adapts to the situation (room, temperatures, the
+action, and *why* it fired — e.g. "the room has cooled to your comfort floor"):
+
+```yaml
+- action: notify.notify
+  data:
+    title: "Passive cooling — {{ room_name }}"
+    message: "{{ message }}"
+```
+
+Prefer to compose your own? Use `reason` for just the "why" clause, or the
+individual temperature variables below.
+
 **Mobile notification example** (open action):
 
 ```yaml
@@ -79,6 +93,8 @@ and ready to format with `| round(1)`:
 | `outside_trend`               | Outdoor rate of change in °/h (`0` if no trend sensor)|
 | `difference_trend`            | `inside_trend − outside_trend` (negative = gap closing)|
 | `recommendation`              | `"Open windows"` or `"Close windows"`                |
+| `reason`                      | Situation-aware "why" clause for this recommendation (e.g. "the room has cooled to your comfort floor (19.0°)") |
+| `message`                     | A complete, paste-ready notification body (room + temperatures + action + reason) |
 
 The threshold variables report the **effective** value in use — the linked
 [global helper](global-overrides.md) when one is set, otherwise the

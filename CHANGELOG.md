@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`reason` and `message` action variables.** `reason` is a short, situation-aware
+  explanation of *why* the recommendation fired — it mirrors the trigger logic
+  (comfort floor, early/morning close, base equilibrium, or the open differential),
+  e.g. "the room has cooled to your comfort floor (19.0°)". `message` is a
+  complete, paste-ready notification body (room, temperatures, the action and the
+  reason); drop `{{ message }}` into a notify service for a good default, or build
+  your own from `reason` and the individual variables. Also exposes the effective
+  `convergence_rate` as an action variable.
+
 ### Changed
 
 - **Documentation restructured into a `docs/` set.** The README is now a lean

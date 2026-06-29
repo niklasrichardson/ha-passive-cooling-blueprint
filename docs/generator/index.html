@@ -263,20 +263,12 @@ function genAutomations(rooms) {
         - action: notify.notify   # replace with your service
           data:
             title: "🪟 Open windows in {{ room_name }}"
-            message: >-
-              {{ room_name }} is {{ inside_temperature | round(1) }}° inside
-              and {{ outside_temperature | round(1) }}° outside
-              ({{ temperature_difference | round(1) }}° cooler out) —
-              open up to cool it down.
+            message: "{{ message }}"   # ready-made; or build your own from {{ reason }}
       close_action:
         - action: notify.notify   # replace with your service
           data:
             title: "🌡️ Close windows in {{ room_name }}"
-            message: >-
-              {{ room_name }} is {{ inside_temperature | round(1) }}° inside
-              and {{ outside_temperature | round(1) }}° outside
-              ({{ temperature_difference | round(1) }}° cooler out) —
-              close up to keep the cool in.`;
+            message: "{{ message }}"`;
   }).join("\n\n");
 }
 
